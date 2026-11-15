@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Al Día · Noticias de todos los medios</title>
+<style>
+  :root {
+    --bg: #f7f5f0; --paper: #fff; --ink: #161514; --muted: #6b6760; --line: #e3dfd6;
+    --accent: #b3261e; --chip: #efebe3; --new: #1f6f43;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141312; --paper: #1c1b19; --ink: #ece8e1; --muted: #a09a90; --line: #2e2c29;
+            --accent: #ff6b5e; --chip: #2a2825; --new: #5fc28a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.45; }
+  a { color: inherit; }
+  header { border-bottom: 3px double var(--line); background: var(--paper); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  .masthead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 18px 0 10px; flex-wrap: wrap; }
+  .logo { font-family: var(--serif); font-size: 34px; font-weight: 700; letter-spacing: -0.5px; text-decoration: none; }
+  .logo span { color: var(--accent); }
+  .meta { font-size: 13px; color: var(--muted); }
+  .bar { display: flex; gap: 10px; padding: 10px 0 14px; flex-wrap: wrap; align-items: center; }
+  .bar input[type=search] { flex: 1; min-width: 200px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
+                            background: var(--bg); color: var(--ink); font-size: 15px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--muted); padding: 8px 12px; font-size: 13px; cursor: pointer; }
+  .seg button.on { background: var(--ink); color: var(--paper); }
+  main { padding: 24px 0 60px; }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 22px; }
+  .card { grid-column: span 4; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+          display: flex; flex-direction: column; text-decoration: none; transition: transform .12s ease, box-shadow .12s ease; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(0,0,0,.07); }
+  .card.lead { grid-column: span 8; grid-row: span 2; }
+  .card.lead:not(:has(img)) { grid-row: auto; }
+  .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--chip); display: block; }
+  .card .in { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .card h2 { font-family: var(--serif); font-size: 21px; line-height: 1.2; margin: 0; }
+  .card.lead h2 { font-size: 32px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .card.lead p { font-size: 16px; }
+  .foot { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+  .badge { background: var(--accent); color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 600; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 2px 8px; }
+  .empty { text-align: center; color: var(--muted); padding: 80px 20px; }
+  .detail { max-width: 760px; margin: 0 auto; }
+  .back { display: inline-block; margin-bottom: 18px; color: var(--muted); text-decoration: none; font-size: 14px; cursor: pointer; }
+  .detail h1 { font-family: var(--serif); font-size: 40px; line-height: 1.12; margin: 0 0 12px; letter-spacing: -0.3px; }
+  .detail .lead { font-family: var(--serif); font-size: 21px; color: var(--muted); margin: 0 0 18px; }
+  .detail .hero { width: 100%; border-radius: 10px; margin: 6px 0 20px; aspect-ratio: 16/9; object-fit: cover; }
+  .detail .body p { font-family: var(--serif); font-size: 18.5px; line-height: 1.6; margin: 0 0 16px; }
+  .note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--line); padding: 4px 12px; margin: 18px 0; }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 36px 0 10px;
+       border-top: 1px solid var(--line); padding-top: 18px; }
+  .timeline { list-style: none; padding: 0; margin: 0; }
+  .timeline li { display: grid; grid-template-columns: 92px 1fr; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .timeline time { font-size: 12px; color: var(--muted); padding-top: 3px; }
+  .timeline .src { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .timeline a { font-family: var(--serif); font-size: 17px; text-decoration: none; display: block; margin: 2px 0; }
+  .timeline a:hover { text-decoration: underline; }
+  .timeline .sum { font-size: 13.5px; color: var(--muted); }
+  .new { color: var(--new); font-size: 11px; font-weight: 700; margin-left: 6px; }
+  @media (max-width: 900px) { .card, .card.lead { grid-column: span 6; } .card.lead { grid-column: span 12; } }
+  @media (max-width: 620px) { .card, .card.lead { grid-column: span 12; } .card.lead h2 { font-size: 25px; }
+    .detail h1 { font-size: 30px; } .timeline li { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="masthead">
+      <a class="logo" href="/" data-nav>Al<span>·</span>Día</a>
+      <div class="meta" id="meta">Cargando…</div>
+    </div>
+    <div class="bar" id="bar">
+      <input type="search" id="q" placeholder="Buscar en las noticias…" autocomplete="off">
+      <div class="seg" id="minsrc">
+        <button data-v="1">Todas</button><button data-v="2" class="on">2+ medios</button>
+        <button data-v="4">4+ medios</button><button data-v="8">Grandes</button>
+      </div>
+      <div class="seg" id="hours">
+        <button data-v="6">6 h</button><button data-v="24">24 h</button><button data-v="48" class="on">48 h</button>
+      </div>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="app"></main>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
+const state = { min: 2, hours: 48, q: "" };
+let timer = null;
+
+function ago(ts) {
+  if (!ts) return "";
+  const m = Math.round((Date.now() / 1000 - ts) / 60);
+  if (m < 1) return "ahora";
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} d`;
+}
+const hhmm = ts => new Date(ts * 1000).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function card(s, i) {
+  const img = safeUrl(s.image);
+  const shown = s.sources.slice(0, i === 0 ? 6 : 3);
+  const more = s.sources.length - shown.length;
+  return `<a class="card ${i === 0 ? "lead" : ""}" href="/noticia/${s.id}" data-nav>
+    ${img ? `<img src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
+    <div class="in">
+      <h2>${esc(s.headline)}</h2>
+      ${s.lead ? `<p>${esc(s.lead)}</p>` : ""}
+      <div class="foot">
+        <span class="badge">${s.n_sources} ${s.n_sources === 1 ? "medio" : "medios"}</span>
+        ${shown.map(x => `<span class="chip">${esc(x)}</span>`).join("")}
+        ${more > 0 ? `<span>+${more}</span>` : ""}
+        <span>· ${ago(s.last_published)}</span>
+      </div>
+    </div></a>`;
+}
+
+async function loadList() {
+  $("#bar").style.display = "";
+  const p = new URLSearchParams({ min_sources: state.min, hours: state.hours, q: state.q, limit: 60 });
+  try {
+    const stories = await (await fetch(`/api/stories?${p}`)).json();
+    $("#app").innerHTML = stories.length
+      ? `<div class="grid">${stories.map(card).join("")}</div>`
+      : `<div class="empty">Todavía no hay noticias con estos filtros.<br>El worker irá añadiéndolas a medida que los medios publiquen.</div>`;
+  } catch (e) {
+    $("#app").innerHTML = `<div class="empty">No se pudo conectar con el servidor.</div>`;
+  }
+}
+
+async function loadStory(id) {
+  $("#bar").style.display = "none";
+  const r = await fetch(`/api/stories/${id}`);
+  if (!r.ok) { $("#app").innerHTML = `<div class="empty">Noticia no encontrada.</div>`; return; }
+  const s = await r.json();
+  if (String(s.id) !== String(id)) history.replaceState(null, "", `/noticia/${s.id}`);
+  document.title = `${s.headline} · Al Día`;
+  const img = safeUrl(s.image);
+  const body = (s.body || "").split(/\n{2,}/).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
+  const pending = s.articles.filter(a => a.new_since_ai).length;
+  $("#app").innerHTML = `<article class="detail">
+    <a class="back" href="/" data-nav>← Portada</a>
+    <h1>${esc(s.headline)}</h1>
+    ${s.lead ? `<p class="lead">${esc(s.lead)}</p>` : ""}
+    <div class="foot" style="margin-bottom:8px">
+      <span class="badge">${s.n_sources} medios</span><span>${s.n_articles} artículos</span>
+      <span>· primera publicación ${hhmm(s.first_published)}</span><span>· última ${ago(s.last_published)}</span>
+    </div>
+    ${img ? `<img class="hero" src="${esc(img)}" alt="" onerror="this.remove()">` : ""}
+    <div class="body">${body}</div>
+    <div class="note">${s.ai_written
+      ? `Texto redactado automáticamente con IA a partir de ${s.ai_sources_count} medios · ${ago(s.ai_written_at)}.${pending ? ` Hay ${pending} artículo(s) nuevo(s) desde entonces; el texto se actualizará en breve.` : ""}`
+      : `Mostrando el titular original del medio más representativo. El texto se redactará cuando haya al menos 2 medios.`}</div>
+    <h3>Cobertura por medio</h3>
+    <ul class="timeline">${s.articles.map(a => `<li>
+      <time>${hhmm(a.published_at)}</time>
+      <div><span class="src">${esc(a.source)}</span>${a.new_since_ai ? `<span class="new">NUEVO</span>` : ""}
+        <a href="${esc(safeUrl(a.url))}" target="_blank" rel="noopener noreferrer">${esc(a.title)}</a>
+        ${a.summary ? `<div class="sum">${esc(a.summary.slice(0, 220))}${a.summary.length > 220 ? "…" : ""}</div>` : ""}
+      </div></li>`).join("")}</ul>
+  </article>`;
+  window.scrollTo(0, 0);
+}
+
+async function loadMeta() {
+  try {
+    const st = await (await fetch("/api/status")).json();
+    const ok = st.sources.filter(s => s.last_status && !s.last_status.startsWith("error")).length;
+    $("#meta").textContent = `${st.clusters.multi || 0} noticias con varios medios · ${ok}/${st.sources.length} medios activos · actualizado ${ago(st.last_cycle)}`;
+  } catch (e) { $("#meta").textContent = ""; }
+}
+
+function route() {
+  clearInterval(timer);
+  const m = location.pathname.match(/^\/noticia\/(\d+)/);
+  if (m) { loadStory(m[1]); timer = setInterval(() => loadStory(m[1]), 120000); }
+  else { document.title = "Al Día · Noticias de todos los medios"; loadList(); timer = setInterval(loadList, 60000); }
+  loadMeta();
+}
+
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-nav]");
+  if (!a || e.metaKey || e.ctrlKey) return;
+  e.preventDefault();
+  history.pushState(null, "", a.getAttribute("href"));
+  route();
+});
+window.addEventListener("popstate", route);
+for (const [id, key] of [["minsrc", "min"], ["hours", "hours"]]) {
+  $("#" + id).addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    $("#" + id).querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    state[key] = +b.dataset.v; loadList();
+  });
+}
+let deb; $("#q").addEventListener("input", e => { clearTimeout(deb); deb = setTimeout(() => { state.q = e.target.value; loadList(); }, 250); });
+route();
+</script>
+</body>
+</html>

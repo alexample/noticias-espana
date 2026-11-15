@@ -1,0 +1,109 @@
+# Al·Día — agregador de noticias de medios españoles
+
+Una web que muestra las noticias más relevantes del momento, agrupando lo que
+publican ~30 medios españoles. Un **worker** lee sus RSS cada 5 minutos y un
+**algoritmo propio (sin IA)** decide si cada artículo es una noticia nueva o
+cobertura de una ya existente. **La IA solo se usa para redactar** el texto de
+cada noticia a partir de las fuentes agrupadas.
+
+Sin dependencias: solo Python 3.10+ (biblioteca estándar) y SQLite.
+
+## Arrancar
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...      # opcional; sin ella se muestra el titular original
+python run.py                            # web + worker en un proceso → http://localhost:8000
+```
+
+O por separado (recomendado en producción):
+
+```bash
+python worker.py            # bucle infinito
+python server.py            # web
+python worker.py --once -v  # un ciclo, mostrando cada decisión NUEVA / AÑADE
+python worker.py --check-feeds   # qué medios responden
+```
+
+## Cómo funciona
+
+```
+ RSS de ~30 medios ──► worker.py ──► textproc.py ──► clustering.py ──► SQLite ──► server.py ──► web
+   (cada 5 min,          descarga      rasgos del       ¿nueva o           noticias,     API JSON
+    peticiones           en paralelo,  artículo         existente?         artículos,
+    condicionales)       deduplica                                         fuentes
+                                                            │
+                                                            └─► writer.py (IA) solo cuando una noticia
+                                                                tiene ≥2 medios o gana medios nuevos
+```
+
+### 1. Rasgos de cada artículo (`textproc.py`)
+- Limpieza de HTML, minúsculas, sin tildes, stopwords en español.
+- Stemming ligero (`gobiernos`/`gobierna` → `gobiern`).
+- **Sinónimos de titular**: `baja / rebaja / recorta` → mismo rasgo; `destituye / despide / cesa` → mismo rasgo.
+- **Siglas**: `Banco Central Europeo` ≡ `BCE`, `Alianza Atlántica` ≡ `OTAN`, `Real Madrid`, etc.
+- **Entidades**: nombres propios y siglas (`Pedro Sánchez`, `Courtois`, `Aemet`).
+- Pesos: titular ×2,5, entradilla ×1, entidades +2, bigramas del titular +1,5.
+
+### 2. ¿Noticia nueva o existente? (`clustering.py`)
+Cada artículo se convierte en un vector TF-IDF (IDF calculado con lo publicado en las
+últimas 72 h) y se compara con todas las noticias activas:
+
+| señal | peso | para qué |
+|---|---|---|
+| coseno con el **centroide** de la noticia | 0,45 | de qué trata la noticia en conjunto |
+| coseno **máximo** con cualquiera de sus artículos | 0,35 | enlaza con la versión más parecida aunque la noticia haya evolucionado |
+| solape de **entidades recurrentes** | 0,20 | mismos protagonistas |
+
+- Puntuación ≥ `NEWS_JOIN_THRESHOLD` (0,24) → se **añade** a la noticia y se actualizan sus fuentes.
+- Si no → **noticia nueva**.
+- Compartir solo un nombre propio no basta (dos noticias distintas sobre Sánchez o el Real Madrid no se mezclan).
+- Tras cada ciclo, dos noticias cuyos centroides se parezcan ≥ 0,50 se **fusionan** (la URL antigua redirige a la nueva).
+- Una noticia sin artículos nuevos en 72 h se cierra.
+
+### 3. Relevancia
+`(suma del peso de los medios distintos + 0,3 × medios que publicaron en las últimas 6 h) × decaimiento`
+con vida media de 10 h. Una noticia que cubren muchos medios y sigue moviéndose sube; una vieja baja sola.
+
+### 4. Redacción con IA (`writer.py`)
+Solo cuando la noticia tiene ≥2 medios y ha ganado medios desde la última redacción (como mucho
+una vez cada 10 min por noticia y 8 por ciclo). Recibe un artículo por medio (titular + extracto),
+con instrucciones de no inventar datos y atribuir discrepancias. Devuelve titular, entradilla y cuerpo.
+
+## Configuración (variables de entorno)
+
+| variable | por defecto | |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | sin ella, no se redacta (se muestra el titular original) |
+| `NEWS_AI_MODEL` | `claude-sonnet-5-5` | |
+| `NEWS_POLL_SECONDS` | 300 | frecuencia de lectura |
+| `NEWS_JOIN_THRESHOLD` | 0.24 | más alto = más estricto (más noticias separadas) |
+| `NEWS_MERGE_THRESHOLD` | 0.50 | fusión de noticias duplicadas |
+| `NEWS_AI_MIN_SOURCES` | 2 | medios mínimos para redactar |
+| `NEWS_DB` | `data/noticias.db` | |
+| `NEWS_PORT` | 8000 | |
+
+Los medios están en `feeds.json` (nombre, URL del RSS y peso para la relevancia). Las URL de
+RSS cambian de vez en cuando: ejecuta `python worker.py --check-feeds` y corrige las que fallen.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -t .
+```
+- `test_clustering`: 25 titulares inventados de 10 historias, con trampas (dos noticias del Real
+  Madrid, dos de Sánchez, la DANA de Valencia frente al Valencia CF). Se prueban 20 órdenes de
+  llegada aleatorios: ninguna noticia se mezcla ni se parte. Umbral válido observado: 0,20–0,28.
+- `test_end_to_end`: feeds RSS locales, tres ciclos del worker (llegada de la primera pieza, llegada
+  del resto que se añade a las existentes, ciclo sin cambios que no vuelve a llamar a la IA) y el servidor HTTP.
+
+## API
+
+- `GET /api/stories?min_sources=2&hours=48&q=texto&limit=40`
+- `GET /api/stories/<id>`: noticia con todos sus artículos (marca los llegados después de la última redacción)
+- `GET /api/status`: estado de cada medio
+
+## Producción
+
+Ejecuta `worker.py` y `server.py` como servicios (systemd, Docker…) detrás de un proxy
+(nginx/Caddy) con HTTPS. SQLite en modo WAL aguanta sin problema un worker escribiendo y la web leyendo.
+Respeta las condiciones de uso de cada medio: solo se guardan titular, extracto y enlace al original.
