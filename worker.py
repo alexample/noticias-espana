@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import config
 import db
+import export
 import feeds
 import writer
 from clustering import Cluster, Corpus, Matcher, vectorize
@@ -212,6 +213,8 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None):
     stats = cluster_items(conn, items, now) if items else {"new": 0, "joined": 0, "merged": 0}
     refresh_clusters(conn, now)
     stats["ai_written"] = write_pending(conn, now)
+    export.prune(conn, config.PRUNE_DAYS)
+    stats["exported"] = export.export_static(conn)
     stats["feeds_ok"] = sum(1 for r in results if not r["status"].startswith("error"))
     stats["feeds"] = len(results)
     stats["seconds"] = round(time.time() - t0, 1)

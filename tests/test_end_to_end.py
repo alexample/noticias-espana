@@ -6,6 +6,7 @@ import tempfile
 import threading
 import time
 import unittest
+import urllib.error
 import urllib.request
 from email.utils import formatdate
 from xml.sax.saxutils import escape
@@ -36,6 +37,11 @@ class EndToEnd(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         config.DB_PATH = os.path.join(self.tmp, "t.db")
+        config.STATIC_DIR = os.path.join(self.tmp, "docs")
+        config.EXPORT_DIR = os.path.join(config.STATIC_DIR, "data")
+        os.makedirs(config.STATIC_DIR)
+        import shutil
+        shutil.copy(os.path.join(ROOT, "docs", "index.html"), config.STATIC_DIR)
         self.calls = []
         config.ANTHROPIC_API_KEY = "test"
 
@@ -112,6 +118,12 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(len(api), len(STORIES))
         html = urllib.request.urlopen(f"{base}/noticia/{top['id']}").read().decode()
         self.assertIn("Al", html)
+        static = json.loads(urllib.request.urlopen(f"{base}/data/stories.json").read())
+        self.assertEqual(len(static["stories"]), len(STORIES))
+        self.assertEqual(static["stories"][0]["id"], top["id"])
+        self.assertEqual(len(static["stories"][0]["articles"]), 5)
+        with self.assertRaises(urllib.error.HTTPError):
+            urllib.request.urlopen(f"{base}/../config.py")
         st = json.loads(urllib.request.urlopen(f"{base}/api/status").read())
         self.assertTrue(all(s["last_status"] == "ok" for s in st["sources"]))
         httpd.shutdown()

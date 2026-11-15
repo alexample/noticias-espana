@@ -12,7 +12,9 @@ def _env(name, default, cast=str):
 # --- Rutas ---
 DB_PATH = _env("NEWS_DB", os.path.join(BASE_DIR, "data", "noticias.db"))
 FEEDS_FILE = _env("NEWS_FEEDS", os.path.join(BASE_DIR, "feeds.json"))
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+STATIC_DIR = os.path.join(BASE_DIR, "docs")             # la web (también es lo que publica GitHub Pages)
+EXPORT_DIR = _env("NEWS_EXPORT_DIR", os.path.join(STATIC_DIR, "data"))  # JSON que lee la web
+PRUNE_DAYS = _env("NEWS_PRUNE_DAYS", 7, int)
 
 # --- Worker ---
 POLL_SECONDS = _env("NEWS_POLL_SECONDS", 300, int)       # cada cuánto se leen los medios

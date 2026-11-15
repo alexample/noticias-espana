@@ -73,7 +73,7 @@
 <header>
   <div class="wrap">
     <div class="masthead">
-      <a class="logo" href="/" data-nav>Al<span>·</span>Día</a>
+      <a class="logo" href="#/">Al<span>·</span>Día</a>
       <div class="meta" id="meta">Cargando…</div>
     </div>
     <div class="bar" id="bar">
@@ -91,11 +91,14 @@
 <main class="wrap" id="app"></main>
 
 <script>
+// La web lee un único archivo estático (data/stories.json) que genera el worker.
+// Funciona igual en GitHub Pages que con server.py.
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
+const fold = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const state = { min: 2, hours: 48, q: "" };
-let timer = null;
+let DATA = { stories: [], merged: {}, generated_at: 0 }, STATUS = null;
 
 function ago(ts) {
   if (!ts) return "";
@@ -107,12 +110,27 @@ function ago(ts) {
 }
 const hhmm = ts => new Date(ts * 1000).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
+async function load() {
+  try {
+    const [d, st] = await Promise.all([
+      fetch(`data/stories.json?t=${Date.now()}`).then(r => r.json()),
+      fetch(`data/status.json?t=${Date.now()}`).then(r => r.json()).catch(() => null),
+    ]);
+    DATA = d; STATUS = st;
+  } catch (e) { DATA = { stories: [], merged: {}, error: true }; }
+  const ok = STATUS ? STATUS.sources.filter(s => s.last_status && !s.last_status.startsWith("error")).length : 0;
+  $("#meta").textContent = STATUS
+    ? `${STATUS.multi} noticias con varios medios · ${ok}/${STATUS.sources.length} medios activos · actualizado ${ago(DATA.generated_at)}`
+    : "";
+  render();
+}
+
 function card(s, i) {
   const img = safeUrl(s.image);
   const shown = s.sources.slice(0, i === 0 ? 6 : 3);
   const more = s.sources.length - shown.length;
-  return `<a class="card ${i === 0 ? "lead" : ""}" href="/noticia/${s.id}" data-nav>
-    ${img ? `<img src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
+  return `<a class="card ${i === 0 ? "lead" : ""}" href="#/noticia/${s.id}">
+    ${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
     <div class="in">
       <h2>${esc(s.headline)}</h2>
       ${s.lead ? `<p>${esc(s.lead)}</p>` : ""}
@@ -125,38 +143,37 @@ function card(s, i) {
     </div></a>`;
 }
 
-async function loadList() {
+function renderList() {
   $("#bar").style.display = "";
-  const p = new URLSearchParams({ min_sources: state.min, hours: state.hours, q: state.q, limit: 60 });
-  try {
-    const stories = await (await fetch(`/api/stories?${p}`)).json();
-    $("#app").innerHTML = stories.length
-      ? `<div class="grid">${stories.map(card).join("")}</div>`
-      : `<div class="empty">Todavía no hay noticias con estos filtros.<br>El worker irá añadiéndolas a medida que los medios publiquen.</div>`;
-  } catch (e) {
-    $("#app").innerHTML = `<div class="empty">No se pudo conectar con el servidor.</div>`;
-  }
+  document.title = "Al Día · Noticias de todos los medios";
+  const since = Date.now() / 1000 - state.hours * 3600, q = fold(state.q.trim());
+  const list = DATA.stories.filter(s => s.n_sources >= state.min && s.last_published >= since &&
+    (!q || fold(s.headline + " " + s.lead + " " + s.articles.map(a => a.title).join(" ")).includes(q)));
+  $("#app").innerHTML = DATA.error
+    ? `<div class="empty">Aún no hay datos. El robot los publicará en su próxima pasada.</div>`
+    : list.length
+      ? `<div class="grid">${list.slice(0, 60).map(card).join("")}</div>`
+      : `<div class="empty">No hay noticias con estos filtros.</div>`;
 }
 
-async function loadStory(id) {
+function renderStory(id) {
   $("#bar").style.display = "none";
-  const r = await fetch(`/api/stories/${id}`);
-  if (!r.ok) { $("#app").innerHTML = `<div class="empty">Noticia no encontrada.</div>`; return; }
-  const s = await r.json();
-  if (String(s.id) !== String(id)) history.replaceState(null, "", `/noticia/${s.id}`);
+  if (DATA.merged[id]) { location.replace(`#/noticia/${DATA.merged[id]}`); return; }
+  const s = DATA.stories.find(x => String(x.id) === String(id));
+  if (!s) { $("#app").innerHTML = `<div class="empty">Noticia no encontrada o ya archivada. <a href="#/">Volver a la portada</a></div>`; return; }
   document.title = `${s.headline} · Al Día`;
   const img = safeUrl(s.image);
   const body = (s.body || "").split(/\n{2,}/).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
   const pending = s.articles.filter(a => a.new_since_ai).length;
   $("#app").innerHTML = `<article class="detail">
-    <a class="back" href="/" data-nav>← Portada</a>
+    <a class="back" href="#/">← Portada</a>
     <h1>${esc(s.headline)}</h1>
     ${s.lead ? `<p class="lead">${esc(s.lead)}</p>` : ""}
     <div class="foot" style="margin-bottom:8px">
       <span class="badge">${s.n_sources} medios</span><span>${s.n_articles} artículos</span>
       <span>· primera publicación ${hhmm(s.first_published)}</span><span>· última ${ago(s.last_published)}</span>
     </div>
-    ${img ? `<img class="hero" src="${esc(img)}" alt="" onerror="this.remove()">` : ""}
+    ${img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
     <div class="body">${body}</div>
     <div class="note">${s.ai_written
       ? `Texto redactado automáticamente con IA a partir de ${s.ai_sources_count} medios · ${ago(s.ai_written_at)}.${pending ? ` Hay ${pending} artículo(s) nuevo(s) desde entonces; el texto se actualizará en breve.` : ""}`
@@ -169,42 +186,26 @@ async function loadStory(id) {
         ${a.summary ? `<div class="sum">${esc(a.summary.slice(0, 220))}${a.summary.length > 220 ? "…" : ""}</div>` : ""}
       </div></li>`).join("")}</ul>
   </article>`;
-  window.scrollTo(0, 0);
 }
 
-async function loadMeta() {
-  try {
-    const st = await (await fetch("/api/status")).json();
-    const ok = st.sources.filter(s => s.last_status && !s.last_status.startsWith("error")).length;
-    $("#meta").textContent = `${st.clusters.multi || 0} noticias con varios medios · ${ok}/${st.sources.length} medios activos · actualizado ${ago(st.last_cycle)}`;
-  } catch (e) { $("#meta").textContent = ""; }
+function render() {
+  const m = location.hash.match(/^#\/noticia\/(\d+)/);
+  m ? renderStory(m[1]) : renderList();
 }
 
-function route() {
-  clearInterval(timer);
-  const m = location.pathname.match(/^\/noticia\/(\d+)/);
-  if (m) { loadStory(m[1]); timer = setInterval(() => loadStory(m[1]), 120000); }
-  else { document.title = "Al Día · Noticias de todos los medios"; loadList(); timer = setInterval(loadList, 60000); }
-  loadMeta();
-}
-
-document.addEventListener("click", e => {
-  const a = e.target.closest("a[data-nav]");
-  if (!a || e.metaKey || e.ctrlKey) return;
-  e.preventDefault();
-  history.pushState(null, "", a.getAttribute("href"));
-  route();
-});
-window.addEventListener("popstate", route);
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
 for (const [id, key] of [["minsrc", "min"], ["hours", "hours"]]) {
   $("#" + id).addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     $("#" + id).querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
-    state[key] = +b.dataset.v; loadList();
+    state[key] = +b.dataset.v; renderList();
   });
 }
-let deb; $("#q").addEventListener("input", e => { clearTimeout(deb); deb = setTimeout(() => { state.q = e.target.value; loadList(); }, 250); });
-route();
+let deb; $("#q").addEventListener("input", e => { clearTimeout(deb); deb = setTimeout(() => { state.q = e.target.value; renderList(); }, 200); });
+// compatibilidad con enlaces antiguos /noticia/123
+const old = location.pathname.match(/\/noticia\/(\d+)/); if (old) location.replace(`./#/noticia/${old[1]}`);
+load();
+setInterval(load, 120000);
 </script>
 </body>
 </html>

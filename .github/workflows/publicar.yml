@@ -1,0 +1,91 @@
+name: Actualizar noticias
+
+# Cada 15 minutos: lee los medios, agrupa las noticias, redacta con IA las que
+# lo necesiten y publica la web en GitHub Pages. GitHub puede retrasar las
+# ejecuciones programadas unos minutos cuando hay mucha carga.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:          # botón "Run workflow" para lanzarlo a mano
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "*.py"
+      - "feeds.json"
+      - ".github/workflows/publicar.yml"
+
+permissions:
+  contents: write   # solo para el "latido" semanal (ver último paso)
+  pages: write
+  id-token: write
+
+concurrency:
+  group: noticias
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # La base de datos (qué artículos ya se han visto y a qué noticia pertenecen)
+      # se guarda en la caché de Actions entre ejecuciones. Si se pierde, se
+      # reconstruye sola con lo publicado en las últimas 48 h.
+      - name: Recuperar base de datos
+        uses: actions/cache/restore@v4
+        with:
+          path: data/noticias.db
+          key: noticias-db-${{ github.run_id }}
+          restore-keys: noticias-db-
+
+      - name: Ejecutar el worker (un ciclo)
+        env:
+          # Secreto opcional: sin él la web muestra el titular original de cada medio.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python worker.py --once
+
+      - name: Compactar base de datos
+        if: always() && hashFiles('data/noticias.db') != ''
+        run: |
+          python -c "import sqlite3; c=sqlite3.connect('data/noticias.db'); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.execute('PRAGMA journal_mode=DELETE'); c.execute('VACUUM'); c.close()"
+          ls -la data/
+
+      - name: Guardar base de datos
+        if: always() && hashFiles('data/noticias.db') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: data/noticias.db
+          key: noticias-db-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # GitHub desactiva las tareas programadas de un repositorio tras 60 días sin
+      # commits. Una vez por semana se guarda un archivo diminuto para evitarlo.
+      - name: Latido semanal
+        run: |
+          semana=$(date -u +%G-W%V)
+          if [ "$(cat estado/latido.txt 2>/dev/null)" != "$semana" ]; then
+            mkdir -p estado && echo "$semana" > estado/latido.txt
+            git config user.name "noticias-bot"
+            git config user.email "noticias-bot@users.noreply.github.com"
+            git add estado/latido.txt
+            git commit -m "Latido $semana"
+            git pull --rebase origin main && git push || echo "No se pudo guardar el latido (se reintentará)"
+          fi

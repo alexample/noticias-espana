@@ -8,7 +8,24 @@ cada noticia a partir de las fuentes agrupadas.
 
 Sin dependencias: solo Python 3.10+ (biblioteca estándar) y SQLite.
 
-## Arrancar
+## Publicación gratuita en GitHub Pages (como está montado)
+
+La web es estática (`docs/index.html` + `docs/data/*.json`). El workflow
+`.github/workflows/publicar.yml` se ejecuta **cada 15 minutos** en GitHub Actions:
+lee los medios, agrupa, redacta con IA lo que haga falta, regenera los JSON y
+publica `docs/` en Pages. La base de datos se conserva entre ejecuciones en la
+caché de Actions (si se pierde, se reconstruye sola con las últimas 48 h).
+
+Puesta en marcha (una sola vez):
+1. El repositorio debe ser **público** (Pages y minutos de Actions gratis).
+2. *Settings → Pages → Build and deployment → Source*: **GitHub Actions**.
+3. *Settings → Secrets and variables → Actions → New repository secret*:
+   `ANTHROPIC_API_KEY` (opcional; sin él se muestra el titular original).
+4. *Actions → Actualizar noticias → Run workflow* para la primera pasada.
+
+La web queda en `https://<usuario>.github.io/noticias-espana/`.
+
+## Arrancar en local
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...      # opcional; sin ella se muestra el titular original
@@ -101,6 +118,8 @@ python -m unittest discover -s tests -t .
 - `GET /api/stories?min_sources=2&hours=48&q=texto&limit=40`
 - `GET /api/stories/<id>`: noticia con todos sus artículos (marca los llegados después de la última redacción)
 - `GET /api/status`: estado de cada medio
+
+(En GitHub Pages no hay API: la web lee `data/stories.json` y filtra en el navegador.)
 
 ## Producción
 

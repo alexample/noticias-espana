@@ -1,6 +1,6 @@
 """Servidor web: API JSON + página. Sin dependencias.
 
-  GET /                      página
+  GET /                      página (docs/index.html) y docs/data/*.json
   GET /api/stories           ?min_sources=2&limit=40&q=texto&hours=48
   GET /api/stories/<id>      detalle con todas las fuentes
   GET /api/status            estado de los medios y del worker
@@ -125,6 +125,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    _TYPES = {".html": "text/html; charset=utf-8", ".json": "application/json; charset=utf-8",
+              ".svg": "image/svg+xml", ".png": "image/png", ".css": "text/css", ".js": "text/javascript"}
+
+    def _static(self, path):
+        root = os.path.realpath(config.STATIC_DIR)
+        rel = urllib.parse.unquote(path).lstrip("/") or "index.html"
+        full = os.path.realpath(os.path.join(root, rel))
+        if not full.startswith(root + os.sep) or not os.path.isfile(full):
+            return self._json({"error": "no encontrado"}, 404)
+        return self._file(full, self._TYPES.get(os.path.splitext(full)[1], "application/octet-stream"))
+
     def do_GET(self):
         url = urllib.parse.urlsplit(self.path)
         qs = urllib.parse.parse_qs(url.query)
@@ -135,8 +146,14 @@ class Handler(BaseHTTPRequestHandler):
             except (TypeError, ValueError):
                 return default
 
-        if url.path in ("/", "/index.html") or url.path.startswith("/noticia/"):
-            return self._file(os.path.join(config.STATIC_DIR, "index.html"), "text/html; charset=utf-8")
+        m = re.match(r"^/noticia/(\d+)", url.path)
+        if m:  # enlaces antiguos -> ruta con almohadilla
+            self.send_response(302)
+            self.send_header("Location", f"/#/noticia/{m.group(1)}")
+            self.end_headers()
+            return
+        if not url.path.startswith("/api/"):
+            return self._static(url.path)
         conn = db.connect()
         try:
             if url.path == "/api/stories":
