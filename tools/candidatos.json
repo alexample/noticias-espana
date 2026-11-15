@@ -1,0 +1,42 @@
+{
+  "El Periódico": [
+    "https://www.elperiodico.com/es/rss/rss_portada.xml",
+    "https://www.elperiodico.com/es/rss/espana/rss.xml",
+    "https://news.google.com/rss/search?q=site:elperiodico.com+when:1d&hl=es&gl=ES&ceid=ES:es"
+  ],
+  "La Razón": [
+    "https://www.larazon.es/rss/portada.xml",
+    "https://www.larazon.es/arc/outboundfeeds/rss/?outputType=xml",
+    "https://www.larazon.es/rss/espana.xml"
+  ],
+  "Público": [
+    "https://www.publico.es/rss/portada",
+    "https://www.publico.es/rss",
+    "https://www.publico.es/rss/politica",
+    "https://www.publico.es/feed"
+  ],
+  "La Voz de Galicia": [
+    "https://www.lavozdegalicia.es/index.xml",
+    "https://www.lavozdegalicia.es/rss/portada.xml",
+    "https://www.lavozdegalicia.es/espana/index.xml",
+    "https://www.lavozdegalicia.es/rss/"
+  ],
+  "Heraldo": [
+    "https://www.heraldo.es/rss/portada",
+    "https://www.heraldo.es/rss/",
+    "https://www.heraldo.es/rss/ultimas-noticias/",
+    "https://www.heraldo.es/rss/aragon/"
+  ],
+  "Cadena SER": [
+    "https://cadenaser.com/arc/outboundfeeds/rss/?outputType=xml",
+    "https://cadenaser.com/arc/outboundfeeds/rss/",
+    "https://cadenaser.com/rss/",
+    "https://feeds.elpais.com/mrss-s/pages/ep/site/cadenaser.com/portada"
+  ],
+  "Vozpópuli": [
+    "https://www.vozpopuli.com/rss",
+    "https://www.vozpopuli.com/rss/",
+    "https://www.vozpopuli.com/feed",
+    "https://www.vozpopuli.com/rss/portada"
+  ]
+}

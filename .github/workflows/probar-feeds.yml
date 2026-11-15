@@ -1,0 +1,20 @@
+name: Probar feeds
+
+# Herramienta manual: prueba las direcciones RSS de tools/candidatos.json desde
+# los servidores de GitHub (los mismos que usa la actualización) y muestra cuáles funcionan.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python tools/probar_feeds.py tools/candidatos.json
