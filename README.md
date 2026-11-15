@@ -91,7 +91,7 @@ con instrucciones de no inventar datos y atribuir discrepancias. Devuelve titula
 | variable | por defecto | |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | — | sin ella, no se redacta (se muestra el titular original) |
-| `NEWS_AI_MODEL` | `claude-sonnet-5-5` | |
+| `NEWS_AI_MODEL` | `claude-haiku-5-5` | Haiku: ~0,05 céntimos por redacción |
 | `NEWS_POLL_SECONDS` | 300 | frecuencia de lectura |
 | `NEWS_JOIN_THRESHOLD` | 0.24 | más alto = más estricto (más noticias separadas) |
 | `NEWS_MERGE_THRESHOLD` | 0.50 | fusión de noticias duplicadas |

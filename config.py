@@ -35,7 +35,7 @@ RELEVANCE_HALF_LIFE_H = _env("NEWS_RELEVANCE_HALF_LIFE_H", 10, float)
 
 # --- Redacción con IA (lo único que usa IA) ---
 ANTHROPIC_API_KEY = _env("ANTHROPIC_API_KEY", "")
-AI_MODEL = _env("NEWS_AI_MODEL", "claude-sonnet-5-5")
+AI_MODEL = _env("NEWS_AI_MODEL", "claude-haiku-5-5")
 AI_MIN_SOURCES = _env("NEWS_AI_MIN_SOURCES", 2, int)        # solo se redactan noticias con N medios o más
 AI_MAX_PER_CYCLE = _env("NEWS_AI_MAX_PER_CYCLE", 8, int)
 AI_MIN_INTERVAL_MIN = _env("NEWS_AI_MIN_INTERVAL_MIN", 10, int)  # no reescribir la misma noticia más a menudo
