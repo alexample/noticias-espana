@@ -1,12 +1,14 @@
 name: Actualizar noticias
 
-# Cada 15 minutos: lee los medios, agrupa las noticias, redacta con IA las que
-# lo necesiten y publica la web en GitHub Pages. GitHub puede retrasar las
-# ejecuciones programadas unos minutos cuando hay mucha carga.
+# Lee los medios, agrupa las noticias, redacta con IA las que lo necesiten y
+# publica la web en GitHub Pages.
+# Cada 15 minutos lo lanza el Worker de Cloudflare (cloudflare/worker.js), que es puntual.
+# El horario de GitHub es solo un respaldo cada hora por si el Worker fallara
+# (GitHub a veces retrasa o se salta sus horarios).
 on:
   schedule:
-    - cron: "*/15 * * * *"
-  workflow_dispatch:          # botón "Run workflow" para lanzarlo a mano
+    - cron: "37 * * * *"
+  workflow_dispatch:          # lo usa el Worker de Cloudflare y el botón "Run workflow"
   push:
     branches: [main]
     paths:

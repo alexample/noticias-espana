@@ -6,6 +6,7 @@ Si no hay ANTHROPIC_API_KEY, se usa el titular del artículo más representativo
 """
 import json
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
@@ -52,28 +53,51 @@ def _pick_articles(articles, limit):
     return picked
 
 
-def call_claude(prompt, system, max_tokens=1200):
-    body = json.dumps({
-        "model": config.AI_MODEL,
-        "max_tokens": max_tokens,
-        "system": system,
-        "messages": [{"role": "user", "content": prompt}],
-    }).encode()
-    req = urllib.request.Request(API_URL, data=body, method="POST", headers={
+def _post(payload):
+    req = urllib.request.Request(API_URL, data=json.dumps(payload).encode(), method="POST", headers={
         "content-type": "application/json",
         "x-api-key": config.ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
     })
-    with urllib.request.urlopen(req, timeout=90) as r:
-        data = json.loads(r.read())
-    return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code}: {e.read()[:300]!r}") from None
+
+
+def call_claude(prompt, system, max_tokens=2000):
+    payload = {
+        "model": config.AI_MODEL,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": prompt}],
+        # Redactar a partir de titulares no necesita razonamiento: sin "thinking" y con
+        # esfuerzo bajo la respuesta es más rápida, más barata y no agota max_tokens pensando.
+        "thinking": {"type": "disabled"},
+        "output_config": {"effort": "low"},
+    }
+    try:
+        data = _post(payload)
+    except RuntimeError as e:
+        if not str(e).startswith("HTTP 400"):
+            raise
+        # modelo que no admite esas opciones: se reintenta con la petición básica
+        payload.pop("thinking"); payload.pop("output_config")
+        payload["max_tokens"] = 4000
+        data = _post(payload)
+    text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    if not text.strip():
+        kinds = [b.get("type") for b in data.get("content", [])]
+        raise ValueError(f"Respuesta sin texto (stop_reason={data.get('stop_reason')}, bloques={kinds})")
+    return text
 
 
 def _parse_json(text):
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end < 0:
-        raise ValueError("La respuesta no contiene JSON")
-    obj = json.loads(text[start:end + 1])
+        raise ValueError(f"La respuesta no contiene JSON: {text[:200]!r}")
+    obj = json.loads(text[start:end + 1], strict=False)  # tolera saltos de línea dentro de cadenas
     for k in ("titular", "entradilla", "cuerpo"):
         if not isinstance(obj.get(k), str) or not obj[k].strip():
             raise ValueError(f"Falta la clave {k}")

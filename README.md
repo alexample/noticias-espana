@@ -11,7 +11,9 @@ Sin dependencias: solo Python 3.10+ (biblioteca estándar) y SQLite.
 ## Publicación gratuita en GitHub Pages (como está montado)
 
 La web es estática (`docs/index.html` + `docs/data/*.json`). El workflow
-`.github/workflows/publicar.yml` se ejecuta **cada 15 minutos** en GitHub Actions:
+`.github/workflows/publicar.yml` se ejecuta **cada 15 minutos** en GitHub Actions,
+lanzado por un Worker de Cloudflare (`cloudflare/worker.js`) porque los horarios
+de GitHub no son puntuales (GitHub solo hace de respaldo cada hora):
 lee los medios, agrupa, redacta con IA lo que haga falta, regenera los JSON y
 publica `docs/` en Pages. La base de datos se conserva entre ejecuciones en la
 caché de Actions (si se pierde, se reconstruye sola con las últimas 48 h).
@@ -22,6 +24,9 @@ Puesta en marcha (una sola vez):
 3. *Settings → Secrets and variables → Actions → New repository secret*:
    `ANTHROPIC_API_KEY` (opcional; sin él se muestra el titular original).
 4. *Actions → Actualizar noticias → Run workflow* para la primera pasada.
+5. Cloudflare → Workers → crear un Worker con `cloudflare/worker.js`, secreto
+   `GITHUB_TOKEN` (token fine-grained con *Actions: Read and write* en este
+   repositorio) y Cron Trigger `*/15 * * * *`.
 
 La web queda en `https://<usuario>.github.io/noticias-espana/`.
 
