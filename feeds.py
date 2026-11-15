@@ -159,6 +159,16 @@ def parse(raw):
     return out
 
 
+def clean_google_news(items):
+    """Google Noticias añade " - Medio" al titular y su descripción solo repite el titular.
+    Se usa para medios que bloquean a los servidores de GitHub."""
+    for it in items:
+        if " - " in it["title"]:
+            it["title"] = it["title"].rsplit(" - ", 1)[0].strip()
+        it["summary"] = ""
+    return items
+
+
 def fetch_source(src):
     """src: sqlite Row/dict de sources. Devuelve dict con resultado."""
     t0 = time.time()
@@ -167,6 +177,8 @@ def fetch_source(src):
         if status == 304:
             return {"name": src["name"], "status": "304", "items": [], "etag": etag, "last_modified": lm}
         items = parse(body)
+        if "news.google.com" in src["feed_url"]:
+            items = clean_google_news(items)
         return {"name": src["name"], "status": "ok", "items": items, "etag": etag, "last_modified": lm,
                 "elapsed": time.time() - t0}
     except Exception as e:  # un medio caído no debe parar el worker
