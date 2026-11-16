@@ -46,6 +46,18 @@
   .foot { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
   .badge { background: var(--accent); color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 600; }
   .chip { background: var(--chip); border-radius: 999px; padding: 2px 8px; }
+  .hot { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 8px 0 18px 10px; margin: -6px 0 0 -10px; scrollbar-width: none; }
+  .hot::-webkit-scrollbar { display: none; }
+  .hot-label { flex: none; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+               display: inline-flex; align-items: center; gap: 6px; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s ease-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(179,38,30,.55); } 100% { box-shadow: 0 0 0 9px rgba(179,38,30,0); } }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+  .tag { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px;
+         background: var(--paper); border: 1px solid var(--line); text-decoration: none; font-size: 14px; font-weight: 600;
+         white-space: nowrap; transition: border-color .12s ease; }
+  .tag:hover { border-color: var(--accent); }
+  .tag b { font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 999px; padding: 1px 7px; }
   .empty { text-align: center; color: var(--muted); padding: 80px 20px; }
   .detail { max-width: 760px; margin: 0 auto; }
   .back { display: inline-block; margin-bottom: 18px; color: var(--muted); text-decoration: none; font-size: 14px; cursor: pointer; }
@@ -143,6 +155,20 @@ function card(s, i) {
     </div></a>`;
 }
 
+// Noticias "en desarrollo": las que más artículos nuevos han recibido en las últimas 2 horas.
+function hotStrip() {
+  const hot = DATA.stories
+    .filter(s => s.n_sources >= 2 && (s.recent_articles || 0) >= 2)
+    .sort((a, b) => (b.recent_sources - a.recent_sources) || (b.recent_articles - a.recent_articles) || (b.relevance - a.relevance))
+    .slice(0, 10);
+  if (!hot.length) return "";
+  const label = s => s.tag || (s.headline.split(/\s+/).slice(0, 5).join(" ") + (s.headline.split(/\s+/).length > 5 ? "…" : ""));
+  return `<nav class="hot" aria-label="Noticias en desarrollo">
+    <span class="hot-label"><span class="pulse"></span>En desarrollo</span>
+    ${hot.map(s => `<a class="tag" href="#/noticia/${s.id}" title="${esc(s.headline)}">${esc(label(s))}<b>+${s.recent_articles}</b></a>`).join("")}
+  </nav>`;
+}
+
 function renderList() {
   $("#bar").style.display = "";
   document.title = "Al Día · Noticias de todos los medios";
@@ -152,7 +178,7 @@ function renderList() {
   $("#app").innerHTML = DATA.error
     ? `<div class="empty">Aún no hay datos. El robot los publicará en su próxima pasada.</div>`
     : list.length
-      ? `<div class="grid">${list.slice(0, 60).map(card).join("")}</div>`
+      ? `${q ? "" : hotStrip()}<div class="grid">${list.slice(0, 60).map(card).join("")}</div>`
       : `<div class="empty">No hay noticias con estos filtros.</div>`;
 }
 

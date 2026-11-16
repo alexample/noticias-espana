@@ -41,8 +41,12 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
         for a in sorted(items, key=lambda a: a["published_at"]):
             if a["source"] not in sources:
                 sources.append(a["source"])
+        recent = [a for a in items if a["fetched_at"] >= now - 2 * 3600]
         stories.append({
             "id": c["id"],
+            "tag": c["tag"],
+            "recent_articles": len(recent),               # artículos llegados en las últimas 2 h
+            "recent_sources": len({a["source"] for a in recent}),
             "headline": c["headline"] or (rep["title"] if rep else ""),
             "lead": c["lead"] or ((rep["summary"] or "")[:300] if rep else ""),
             "body": c["body"] or "",

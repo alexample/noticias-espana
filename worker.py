@@ -193,8 +193,9 @@ def write_pending(conn, now):
             story = writer.write_story(arts)
             conn.execute(
                 """UPDATE clusters SET headline=?, lead=?, body=?, ai_written_at=?, ai_sources_count=?,
-                       ai_error=NULL WHERE id=?""",
-                (story["headline"], story["lead"], story["body"], time.time(), row["n_sources"], row["id"]))
+                       ai_error=NULL, tag=COALESCE(?, tag) WHERE id=?""",
+                (story["headline"], story["lead"], story["body"], time.time(), row["n_sources"],
+                 story.get("tag"), row["id"]))
             done += 1
         except Exception as e:
             log.warning("IA falló en noticia %s: %s", row["id"], e)

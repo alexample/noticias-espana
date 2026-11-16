@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS clusters (
     body             TEXT,
     ai_written_at    REAL,
     ai_sources_count INTEGER,
-    ai_error         TEXT
+    ai_error         TEXT,
+    tag              TEXT      -- etiqueta corta del tema (IA)
 );
 CREATE INDEX IF NOT EXISTS idx_clusters_status_rel ON clusters(status, relevance DESC);
 
@@ -73,6 +74,9 @@ def connect(path=None):
 
 def init(conn):
     conn.executescript(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(clusters)")}
+    if "tag" not in cols:  # bases de datos creadas antes de existir la etiqueta
+        conn.execute("ALTER TABLE clusters ADD COLUMN tag TEXT")
     conn.commit()
 
 

@@ -27,6 +27,7 @@ PROMPT = """Estos son los artículos que distintos medios han publicado sobre la
 {sources}
 
 Redacta la noticia. Devuelve SOLO un objeto JSON válido con estas claves:
+- "etiqueta": el tema en 1-3 palabras, como lo rotularía una portada (p. ej. "DANA Valencia", "Presupuestos 2027", "Cumbre OTAN"). Sin verbos ni artículos.
 - "titular": máximo 14 palabras, informativo, sin clickbait.
 - "entradilla": 1-2 frases con lo esencial (qué, quién, cuándo, dónde).
 - "cuerpo": 2-4 párrafos breves separados por "\\n\\n". Incluye la evolución de la noticia si los artículos más recientes aportan novedades, y atribuye los datos al medio que los publica cuando sea relevante.
@@ -113,8 +114,9 @@ def write_story(articles):
     for attempt in range(2):
         try:
             obj = _parse_json(call_claude(prompt, SYSTEM))
+            tag = obj.get("etiqueta") if isinstance(obj.get("etiqueta"), str) else ""
             return {"headline": obj["titular"].strip(), "lead": obj["entradilla"].strip(),
-                    "body": obj["cuerpo"].strip()}
+                    "body": obj["cuerpo"].strip(), "tag": tag.strip().strip(".")[:40] or None}
         except Exception as e:
             last_err = e
             time.sleep(2 * (attempt + 1))
