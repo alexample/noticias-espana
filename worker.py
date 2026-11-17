@@ -209,6 +209,8 @@ def write_pending(conn, now):
                 (story["headline"], story["lead"], story["body"], written_at, row["n_sources"],
                  story.get("tag"), row["id"]))
             done += 1
+            log.info("Redactada noticia %s (%d medios)%s", row["id"], row["n_sources"],
+                     f" · novedad: {story['note']}" if story.get("note") else "")
         except Exception as e:
             log.warning("IA falló en noticia %s: %s", row["id"], e)
             conn.execute("UPDATE clusters SET ai_error=? WHERE id=?", (str(e)[:300], row["id"]))
