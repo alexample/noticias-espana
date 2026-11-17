@@ -44,6 +44,7 @@ class EndToEnd(unittest.TestCase):
         shutil.copy(os.path.join(ROOT, "docs", "index.html"), config.STATIC_DIR)
         self.calls = []
         config.ANTHROPIC_API_KEY = "test"
+        config.INTL_ENABLED = 0  # la cobertura internacional se prueba aparte (test_intl)
 
         def fake_claude(prompt, system, max_tokens=1200):
             self.calls.append(prompt)

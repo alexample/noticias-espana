@@ -8,6 +8,7 @@ import os
 import time
 
 import config
+import intl
 
 
 def _write(path, obj):
@@ -32,6 +33,16 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
                 f"""SELECT id, cluster_id, source, title, summary, url, image, published_at, fetched_at
                     FROM articles WHERE cluster_id IN ({q}) ORDER BY published_at DESC""", ids):
             arts.setdefault(a["cluster_id"], []).append(a)
+    foreign = {}
+    if ids:
+        for f in conn.execute(
+                f"""SELECT cluster_id, country, source, title, url, published_at FROM intl_articles
+                    WHERE cluster_id IN ({q}) ORDER BY published_at DESC""", ids):
+            foreign.setdefault(f["cluster_id"], {}).setdefault(f["country"], []).append(f)
+    try:
+        countries = intl.load_countries()
+    except (OSError, ValueError):
+        countries = {}
     stories = []
     for c in clusters:
         items = arts.get(c["id"], [])
@@ -60,6 +71,12 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
             "first_published": c["first_published"],
             "last_published": c["last_published"],
             "sources": sources,
+            "intl": [{
+                "country": code, "name": countries.get(code, {}).get("name", code.upper()),
+                "flag": countries.get(code, {}).get("flag", ""),
+                "articles": [{"source": f["source"], "title": f["title"], "url": f["url"],
+                              "published_at": f["published_at"]} for f in fs[:8]],
+            } for code, fs in foreign.get(c["id"], {}).items()],
             "articles": [{
                 "source": a["source"], "title": a["title"], "url": a["url"],
                 "summary": (a["summary"] or "")[:240], "published_at": a["published_at"],
@@ -84,6 +101,8 @@ def prune(conn, days=7):
     cutoff = time.time() - days * 86400
     conn.execute("DELETE FROM articles WHERE published_at < ? AND cluster_id IN "
                  "(SELECT id FROM clusters WHERE status != 'active')", (cutoff,))
+    conn.execute("DELETE FROM intl_articles WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "
+                 "AND fetched_at < ?", (cutoff,))
     conn.execute("""DELETE FROM clusters WHERE status != 'active' AND updated_at < ?
                     AND id NOT IN (SELECT DISTINCT cluster_id FROM articles WHERE cluster_id IS NOT NULL)""",
                  (cutoff,))

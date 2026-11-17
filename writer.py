@@ -105,11 +105,19 @@ def _parse_json(text):
     return obj
 
 
-def write_story(articles):
+def _fmt_foreign(foreign):
+    if not foreign:
+        return ""
+    lines = [f"[{f['source']} · {f['country'].upper()}] {f['title']}" for f in foreign]
+    return ("\n\nTitulares de la prensa del país implicado (en su idioma original; úsalos solo para contrastar "
+            "y, si aportan algo, menciona cómo lo cuenta esa prensa):\n" + "\n".join(lines))
+
+
+def write_story(articles, foreign=None):
     """articles: lista de dicts (source, title, summary, published_at).
     Devuelve dict(headline, lead, body)."""
     picked = _pick_articles(articles, config.AI_MAX_SOURCES_IN_PROMPT)
-    prompt = PROMPT.format(sources=_fmt_sources(picked))
+    prompt = PROMPT.format(sources=_fmt_sources(picked) + _fmt_foreign(foreign))
     last_err = None
     for attempt in range(2):
         try:

@@ -91,6 +91,16 @@ Solo cuando la noticia tiene ≥2 medios y ha ganado medios desde la última red
 una vez cada 10 min por noticia y 8 por ciclo). Recibe un artículo por medio (titular + extracto),
 con instrucciones de no inventar datos y atribuir discrepancias. Devuelve titular, entradilla y cuerpo.
 
+### 5. Cobertura internacional (`intl.py`, `countries.json`)
+Sin IA. Si una noticia relevante (≥3 medios) trata de otro país —su nombre, gentilicio,
+capital o dirigentes aparecen en al menos el 40% de los artículos— se buscan en la
+edición de Google Noticias de ese país los nombres propios de la noticia que se escriben
+igual en cualquier idioma (Trump, Merz, Volkswagen…), con las siglas traducidas
+(OTAN→NATO, UE→EU…). Solo se aceptan titulares que contengan esos nombres, uno por medio.
+Países incluidos: Estados Unidos, Reino Unido, Alemania, Francia, Italia, Portugal, México
+y Argentina; se añaden más en `countries.json`. Esos titulares se muestran en la web y se
+pasan a la IA para que contraste cómo lo cuenta la prensa de ese país.
+
 ## Configuración (variables de entorno)
 
 | variable | por defecto | |

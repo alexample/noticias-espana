@@ -1,0 +1,52 @@
+{
+  "_ayuda": "Países cuya prensa se consulta cuando una noticia trata de ellos. 'terms' son palabras en español (sin tildes) que indican el país; 'names' son nombres propios que se escriben igual en cualquier idioma (sirven para buscar). 'gnews' es la edición de Google Noticias de ese país. Los cargos (presidentes, primeros ministros) cambian: revísalos de vez en cuando.",
+  "us": {
+    "name": "Estados Unidos", "flag": "🇺🇸", "lang": "en",
+    "gnews": "hl=en-US&gl=US&ceid=US:en",
+    "terms": ["estados unidos", "eeuu", "ee uu", "estadounidense", "estadounidenses", "norteamericano", "norteamericana",
+              "washington", "casa blanca", "pentagono", "wall street", "nueva york", "california", "texas", "florida"],
+    "names": ["trump", "vance", "rubio", "hegseth", "bessent", "pentagon"]
+  },
+  "uk": {
+    "name": "Reino Unido", "flag": "🇬🇧", "lang": "en",
+    "gnews": "hl=en-GB&gl=GB&ceid=GB:en",
+    "terms": ["reino unido", "britanico", "britanica", "britanicos", "britanicas", "londres", "downing street", "escocia", "gales", "irlanda del norte"],
+    "names": ["starmer", "farage", "badenoch", "reeves", "westminster"]
+  },
+  "de": {
+    "name": "Alemania", "flag": "🇩🇪", "lang": "de",
+    "gnews": "hl=de&gl=DE&ceid=DE:de",
+    "terms": ["alemania", "aleman", "alemana", "alemanes", "alemanas", "berlin", "francfort", "munich", "baviera", "hamburgo"],
+    "names": ["merz", "bundestag", "bundesbank", "afd", "cdu", "spd", "volkswagen", "scholz"]
+  },
+  "fr": {
+    "name": "Francia", "flag": "🇫🇷", "lang": "fr",
+    "gnews": "hl=fr&gl=FR&ceid=FR:fr",
+    "terms": ["francia", "frances", "francesa", "franceses", "francesas", "paris", "eliseo", "marsella", "lyon"],
+    "names": ["macron", "le pen", "bardella", "melenchon", "lecornu"]
+  },
+  "it": {
+    "name": "Italia", "flag": "🇮🇹", "lang": "it",
+    "gnews": "hl=it&gl=IT&ceid=IT:it",
+    "terms": ["italia", "italiano", "italiana", "italianos", "italianas", "napoles", "sicilia", "lampedusa"],
+    "names": ["meloni", "salvini", "tajani", "mattarella", "schlein"]
+  },
+  "pt": {
+    "name": "Portugal", "flag": "🇵🇹", "lang": "pt",
+    "gnews": "hl=pt-PT&gl=PT&ceid=PT:pt-150",
+    "terms": ["portugal", "portugues", "portuguesa", "portugueses", "portuguesas", "lisboa", "oporto"],
+    "names": ["montenegro", "rebelo de sousa"]
+  },
+  "mx": {
+    "name": "México", "flag": "🇲🇽", "lang": "es",
+    "gnews": "hl=es-419&gl=MX&ceid=MX:es-419",
+    "terms": ["mexico", "mexicano", "mexicana", "mexicanos", "mexicanas", "ciudad de mexico"],
+    "names": ["sheinbaum", "pemex"]
+  },
+  "ar": {
+    "name": "Argentina", "flag": "🇦🇷", "lang": "es",
+    "gnews": "hl=es-419&gl=AR&ceid=AR:es-419",
+    "terms": ["argentina", "argentino", "argentinos", "argentinas", "buenos aires"],
+    "names": ["milei", "casa rosada", "kirchner"]
+  }
+}

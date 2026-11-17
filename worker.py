@@ -16,6 +16,7 @@ import config
 import db
 import export
 import feeds
+import intl
 import writer
 from clustering import Cluster, Corpus, Matcher, vectorize
 from textproc import article_features, fold
@@ -127,6 +128,8 @@ def cluster_items(conn, items, now):
     merges = matcher.merge_pass()
     for src, dst in merges:
         conn.execute("UPDATE articles SET cluster_id=? WHERE cluster_id=?", (dst, src))
+        conn.execute("UPDATE OR IGNORE intl_articles SET cluster_id=? WHERE cluster_id=?", (dst, src))
+        conn.execute("DELETE FROM intl_articles WHERE cluster_id=?", (src,))
         conn.execute("UPDATE clusters SET status='merged', merged_into=? WHERE id=?", (dst, src))
         conn.execute("UPDATE clusters SET updated_at=? WHERE id=?", (now, dst))
     stats["merged"] = len(merges)
@@ -190,7 +193,10 @@ def write_pending(conn, now):
         arts = [dict(a) for a in conn.execute(
             "SELECT source, title, summary, published_at FROM articles WHERE cluster_id=?", (row["id"],))]
         try:
-            story = writer.write_story(arts)
+            foreign = [dict(a) for a in conn.execute(
+                "SELECT country, source, title, published_at FROM intl_articles WHERE cluster_id=? "
+                "ORDER BY published_at DESC LIMIT 8", (row["id"],))]
+            story = writer.write_story(arts, foreign)
             conn.execute(
                 """UPDATE clusters SET headline=?, lead=?, body=?, ai_written_at=?, ai_sources_count=?,
                        ai_error=NULL, tag=COALESCE(?, tag) WHERE id=?""",
@@ -213,6 +219,11 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None):
     items = new_items(conn, results, now)
     stats = cluster_items(conn, items, now) if items else {"new": 0, "joined": 0, "merged": 0}
     refresh_clusters(conn, now)
+    try:
+        stats["intl"] = intl.process(conn, now)
+    except Exception:
+        log.exception("Cobertura internacional falló")
+        stats["intl"] = 0
     stats["ai_written"] = write_pending(conn, now)
     export.prune(conn, config.PRUNE_DAYS)
     stats["exported"] = export.export_static(conn)
@@ -220,8 +231,8 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None):
     stats["feeds"] = len(results)
     stats["seconds"] = round(time.time() - t0, 1)
     log.info("Ciclo: %d artículos nuevos -> %d noticias nuevas, %d añadidos a existentes, %d fusiones, "
-             "%d redactadas · feeds %d/%d · %.1fs", len(items), stats["new"], stats["joined"], stats["merged"],
-             stats["ai_written"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
+             "%d redactadas, %d artículos internacionales · feeds %d/%d · %.1fs", len(items), stats["new"],
+             stats["joined"], stats["merged"], stats["ai_written"], stats["intl"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
     return stats
 
 

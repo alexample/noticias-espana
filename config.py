@@ -41,6 +41,14 @@ AI_MAX_PER_CYCLE = _env("NEWS_AI_MAX_PER_CYCLE", 8, int)
 AI_MIN_INTERVAL_MIN = _env("NEWS_AI_MIN_INTERVAL_MIN", 10, int)  # no reescribir la misma noticia más a menudo
 AI_MAX_SOURCES_IN_PROMPT = 15
 
+# --- Cobertura internacional (prensa del país del que trata la noticia) ---
+COUNTRIES_FILE = _env("NEWS_COUNTRIES", os.path.join(BASE_DIR, "countries.json"))
+INTL_ENABLED = _env("NEWS_INTL", 1, int)
+INTL_MIN_SOURCES = _env("NEWS_INTL_MIN_SOURCES", 3, int)    # solo noticias con cierta relevancia
+INTL_MAX_PER_CYCLE = _env("NEWS_INTL_MAX_PER_CYCLE", 4, int)  # limita peticiones a Google Noticias
+INTL_RECHECK_MIN = _env("NEWS_INTL_RECHECK_MIN", 60, int)     # cada cuánto se vuelve a buscar
+INTL_MAX_PER_COUNTRY = 6
+
 # --- Web ---
 HOST = _env("NEWS_HOST", "0.0.0.0")
 PORT = _env("NEWS_PORT", 8000, int)

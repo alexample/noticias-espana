@@ -57,6 +57,20 @@ CREATE TABLE IF NOT EXISTS articles (
     match_score  REAL
 );
 CREATE INDEX IF NOT EXISTS idx_articles_cluster ON articles(cluster_id);
+
+-- Artículos de la prensa del país del que trata la noticia (vía Google Noticias de ese país)
+CREATE TABLE IF NOT EXISTS intl_articles (
+    id           INTEGER PRIMARY KEY,
+    cluster_id   INTEGER NOT NULL,
+    country      TEXT NOT NULL,
+    source       TEXT NOT NULL,
+    title        TEXT NOT NULL,
+    url          TEXT NOT NULL,
+    published_at REAL NOT NULL,
+    fetched_at   REAL NOT NULL,
+    UNIQUE (cluster_id, url)
+);
+CREATE INDEX IF NOT EXISTS idx_intl_cluster ON intl_articles(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_articles_pub ON articles(published_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_source_title ON articles(source, title_key);
 """
@@ -74,9 +88,11 @@ def connect(path=None):
 
 def init(conn):
     conn.executescript(SCHEMA)
+    # columnas añadidas después de la primera versión
     cols = {r[1] for r in conn.execute("PRAGMA table_info(clusters)")}
-    if "tag" not in cols:  # bases de datos creadas antes de existir la etiqueta
-        conn.execute("ALTER TABLE clusters ADD COLUMN tag TEXT")
+    for name, kind in (("tag", "TEXT"), ("intl_countries", "TEXT"), ("intl_checked_at", "REAL")):
+        if name not in cols:
+            conn.execute(f"ALTER TABLE clusters ADD COLUMN {name} {kind}")
     conn.commit()
 
 
