@@ -14,6 +14,7 @@ import time
 import urllib.error
 import urllib.request
 
+import breaking
 import config
 
 log = logging.getLogger("telegram")
@@ -69,11 +70,20 @@ def _link(cid):
 def _media_line(sources):
     n = len(sources)
     names = ", ".join(sources[:4]) + (f" y {n - 4} más" if n > 4 else "")
+    if n == 1:
+        return f"Fuente: {_e(names)}"
     return f"✅ Confirmada por {n} medios: {_e(names)}"
 
 
-def format_new(story, sources, flags):
-    lines = [f"{_e(config.TELEGRAM_HEADER)}  ·  <i>Última hora</i>", "", f"🔴 <b>{_e(story['headline'])}</b>", ""]
+def _header(label, n_sources):
+    ticks = "✓✓" if n_sources >= 2 else "✓"
+    return f"{_e(config.TELEGRAM_HEADER)} {ticks}  ·  <i>{label}</i>"
+
+
+def format_new(story, sources, flags, is_breaking=False):
+    """Noticia ya redactada por la IA (confirmada por varios medios)."""
+    lines = [_header("Última hora" if is_breaking else "Noticia confirmada", len(sources)), "",
+             f"{'🔴' if is_breaking else '🗞'} <b>{_e(story['headline'])}</b>", ""]
     if story["lead"]:
         lines += [_e(story["lead"]), ""]
     lines.append(_media_line(sources))
@@ -83,8 +93,30 @@ def format_new(story, sources, flags):
     return "\n".join(lines)
 
 
+def format_breaking(story, rep, sources):
+    """Última hora todavía sin redactar: titular original citando al medio, sin IA."""
+    title = breaking.strip_label(rep["title"])
+    lines = [_header("Última hora", len(sources)), "", f"🔴 <b>{_e(title)}</b>", "",
+             f"Según {_e(rep['source'])}."]
+    if len(sources) == 1:
+        lines.append("☑️ Pendiente de confirmar por otros medios")
+    else:
+        lines.append(_media_line(sources))
+    lines += ["", _link(story["id"])]
+    return "\n".join(lines)
+
+
+def format_confirmed(story, sources):
+    """Respuesta cuando una última hora publicada con un medio queda confirmada y redactada."""
+    lines = [_header("Confirmada", len(sources)), "", f"✅ <b>{_e(story['headline'])}</b>", ""]
+    if story["lead"]:
+        lines += [_e(story["lead"]), ""]
+    lines += [_media_line(sources), "", _link(story["id"])]
+    return "\n".join(lines)
+
+
 def format_update(story, note, n_sources):
-    return "\n".join([f"{_e(config.TELEGRAM_HEADER)}  ·  <i>Actualización</i>", "",
+    return "\n".join([_header("Actualización", n_sources), "",
                       f"🔄 <b>{_e(note)}</b>", "", f"✅ Ya la confirman {n_sources} medios", "", _link(story["id"])])
 
 
@@ -107,7 +139,7 @@ def mark_existing(conn, now, keep=0):
     inundar el canal con todo lo acumulado."""
     conn.execute(
         """INSERT OR IGNORE INTO telegram_posts(cluster_id, message_id, posted_at, last_update_at)
-           SELECT id, NULL, ?, ? FROM clusters WHERE status='active' AND n_sources >= ?
+           SELECT id, NULL, ?, ? FROM clusters WHERE status='active' AND (n_sources >= ? OR breaking_at IS NOT NULL)
              AND id NOT IN (SELECT id FROM clusters WHERE status='active' AND n_sources >= ?
                             AND headline IS NOT NULL ORDER BY relevance DESC LIMIT ?)""",
         (now, now, config.TELEGRAM_MIN_SOURCES, config.TELEGRAM_MIN_SOURCES, keep))
@@ -127,23 +159,50 @@ def process(conn, now, sender=None, countries=None, written_before=None):
             countries = {}
     new = updates = 0
     try:
-        # 1) noticias que acaban de cruzar el umbral
+        # 1) noticias que acaban de cruzar el umbral, o de última hora (aunque tengan un solo medio)
         rows = conn.execute(
-            """SELECT c.* FROM clusters c LEFT JOIN telegram_posts t ON t.cluster_id = c.id
-               WHERE t.cluster_id IS NULL AND c.status='active' AND c.n_sources >= ?
-                 AND c.headline IS NOT NULL AND c.last_published >= ?
-                 AND (? IS NULL OR c.ai_written_at < ?)   -- su página para compartir ya está en la web
-               ORDER BY c.relevance DESC LIMIT ?""",
-            (config.TELEGRAM_MIN_SOURCES, now - 6 * 3600, written_before, written_before,
+            """SELECT c.*, a.title AS rep_title, a.source AS rep_source
+               FROM clusters c LEFT JOIN telegram_posts t ON t.cluster_id = c.id
+                    LEFT JOIN articles a ON a.id = c.rep_article_id
+               WHERE t.cluster_id IS NULL AND c.status='active' AND c.last_published >= ?
+                 AND ((c.n_sources >= ? AND c.headline IS NOT NULL
+                       AND (? IS NULL OR c.ai_written_at < ?))       -- su página ya está en la web
+                      OR (c.breaking_at IS NOT NULL AND c.breaking_at >= ?
+                          AND (? IS NULL OR c.breaking_at < ?)))
+               ORDER BY (c.breaking_at IS NOT NULL) DESC, c.relevance DESC LIMIT ?""",
+            (now - 6 * 3600, config.TELEGRAM_MIN_SOURCES, written_before, written_before,
+             now - breaking.BREAKING_TTL_S, written_before, written_before,
              config.TELEGRAM_MAX_NEW_PER_CYCLE)).fetchall()
         for c in rows:
-            msg_id = sender(format_new(c, _sources(conn, c["id"]), _flags(conn, c["id"], countries)),
-                            preview_url=page_url(c["id"]))
+            srcs = _sources(conn, c["id"])
+            is_breaking = c["breaking_at"] is not None
+            if c["headline"]:
+                text = format_new(c, srcs, _flags(conn, c["id"], countries), is_breaking)
+            elif c["rep_title"]:
+                text = format_breaking(c, {"title": c["rep_title"], "source": c["rep_source"]}, srcs)
+            else:
+                continue
+            msg_id = sender(text, preview_url=page_url(c["id"]))
             # last_update_at = ai_written_at: las novedades anteriores ya están en el mensaje
-            conn.execute("INSERT INTO telegram_posts VALUES (?,?,?,?)", (c["id"], msg_id, now, c["ai_written_at"] or now))
+            conn.execute(
+                "INSERT INTO telegram_posts(cluster_id, message_id, posted_at, last_update_at, posted_ai) VALUES (?,?,?,?,?)",
+                (c["id"], msg_id, now, c["ai_written_at"] or now, 1 if c["headline"] else 0))
             conn.commit()
             new += 1
-            log.info("Telegram: publicada noticia %s", c["id"])
+            log.info("Telegram: publicada noticia %s%s", c["id"], " (última hora)" if is_breaking else "")
+            time.sleep(1)
+
+        # 1b) últimas horas publicadas con el titular original que ya están confirmadas y redactadas
+        for r in conn.execute(
+                """SELECT c.*, t.message_id FROM telegram_posts t JOIN clusters c ON c.id = t.cluster_id
+                   WHERE t.posted_ai = 0 AND t.message_id IS NOT NULL AND c.status='active'
+                     AND c.headline IS NOT NULL AND c.n_sources >= 2
+                   ORDER BY c.relevance DESC LIMIT ?""", (config.TELEGRAM_MAX_UPDATES_PER_CYCLE,)).fetchall():
+            sender(format_confirmed(r, _sources(conn, r["id"])), reply_to=r["message_id"])
+            conn.execute("UPDATE telegram_posts SET posted_ai=1, last_update_at=? WHERE cluster_id=?", (now, r["id"]))
+            conn.commit()
+            updates += 1
+            log.info("Telegram: confirmada noticia %s", r["id"])
             time.sleep(1)
 
         # 2) novedades de noticias ya publicadas, como respuesta al mensaje original

@@ -121,6 +121,14 @@ Sin IA adicional: reutiliza lo que ya redacta la IA.
 Configuración: crear un bot con @BotFather, añadirlo como administrador del canal y
 guardar en GitHub los secretos `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` (`@nombre_del_canal`).
 
+### 8. Última hora con un solo medio (`breaking.py`)
+Sin IA. Una noticia es de última hora si un medio la titula "Última hora" o "Urgente"
+(sin contar los directos recurrentes) o si 3 medios la publican en menos de 45 minutos.
+Se muestra en la web y se publica en Telegram aunque solo la tenga un medio, con un
+check ✓ "pendiente de confirmar" y el titular original citando al medio. Cuando otros
+medios la confirman, la IA la redacta (tiene prioridad) y en Telegram se responde al
+mensaje original con la versión confirmada ✓✓.
+
 ## Configuración (variables de entorno)
 
 | variable | por defecto | |

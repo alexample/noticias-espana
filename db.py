@@ -110,9 +110,13 @@ def init(conn):
     conn.executescript(SCHEMA)
     # columnas añadidas después de la primera versión
     cols = {r[1] for r in conn.execute("PRAGMA table_info(clusters)")}
-    for name, kind in (("tag", "TEXT"), ("intl_countries", "TEXT"), ("intl_checked_at", "REAL")):
+    for name, kind in (("tag", "TEXT"), ("intl_countries", "TEXT"), ("intl_checked_at", "REAL"),
+                       ("breaking_at", "REAL")):
         if name not in cols:
             conn.execute(f"ALTER TABLE clusters ADD COLUMN {name} {kind}")
+    tcols = {r[1] for r in conn.execute("PRAGMA table_info(telegram_posts)")}
+    if "posted_ai" not in tcols:  # 0 = publicada como última hora con el titular original, sin redactar
+        conn.execute("ALTER TABLE telegram_posts ADD COLUMN posted_ai INTEGER NOT NULL DEFAULT 1")
     conn.commit()
 
 

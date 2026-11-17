@@ -8,6 +8,7 @@ import json
 import os
 import time
 
+import breaking
 import config
 import intl
 
@@ -110,7 +111,7 @@ def write_share_pages(conn, pages_dir, site_url, days=7):
     rows = conn.execute(
         """SELECT c.id, c.status, c.merged_into, c.headline, c.lead, c.image, a.title AS rep_title, a.summary AS rep_summary
            FROM clusters c LEFT JOIN articles a ON a.id = c.rep_article_id
-           WHERE (c.status != 'merged' AND c.n_sources >= 2 AND c.last_published >= ?)
+           WHERE (c.status != 'merged' AND (c.n_sources >= 2 OR c.breaking_at IS NOT NULL) AND c.last_published >= ?)
               OR (c.status = 'merged' AND c.updated_at >= ?)""", (since, since)).fetchall()
     by_id = {r["id"]: r for r in rows}
     n = 0
@@ -120,7 +121,7 @@ def write_share_pages(conn, pages_dir, site_url, days=7):
         while by_id.get(target_id) is not None and by_id[target_id]["status"] == "merged" and hops < 10:
             target_id, hops = by_id[target_id]["merged_into"], hops + 1
         t = by_id.get(target_id) or r
-        title = t["headline"] or t["rep_title"] or "DobleCheck"
+        title = t["headline"] or (breaking.strip_label(t["rep_title"]) if t["rep_title"] else "DobleCheck")
         desc = (t["lead"] or t["rep_summary"] or "Noticias de todos los medios").strip()[:280]
         image = t["image"] if (t["image"] or "").startswith("http") else site_url + "og.png"
         target = f"{site_url}#/noticia/{target_id}"
@@ -188,9 +189,10 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
         stories.append({
             "id": c["id"],
             "tag": c["tag"],
+            "breaking": bool(c["breaking_at"]) and now - c["breaking_at"] <= breaking.BREAKING_TTL_S,
             "recent_articles": len(recent),               # artículos llegados en las últimas 2 h
             "recent_sources": len({a["source"] for a in recent}),
-            "headline": c["headline"] or (rep["title"] if rep else ""),
+            "headline": c["headline"] or (breaking.strip_label(rep["title"]) if rep else ""),
             "lead": c["lead"] or ((rep["summary"] or "")[:300] if rep else ""),
             "body": c["body"] or "",
             "ai_written": c["headline"] is not None,

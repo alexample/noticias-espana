@@ -58,7 +58,7 @@ TELEGRAM_MAX_UPDATES_PER_CYCLE = _env("TELEGRAM_MAX_UPDATES_PER_CYCLE", 4, int)
 TELEGRAM_UPDATE_EVERY_MIN = _env("TELEGRAM_UPDATE_EVERY_MIN", 30, int)  # por noticia
 # Cabecera "de periódico" con letras góticas Unicode (Telegram no permite elegir fuente).
 # Estos alfabetos no tienen tildes ni ñ: por eso solo se usan en la cabecera, no en titulares.
-TELEGRAM_HEADER = _env("TELEGRAM_HEADER", "𝕯𝖔𝖇𝖑𝖊𝕮𝖍𝖊𝖈𝖐 ✓✓")
+TELEGRAM_HEADER = _env("TELEGRAM_HEADER", "𝕯𝖔𝖇𝖑𝖊𝕮𝖍𝖊𝖈𝖐")  # se le añade ✓ (1 medio) o ✓✓ (confirmada)
 SITE_URL = _env("NEWS_SITE_URL", "https://alexample.github.io/noticias-espana/")
 
 # --- Web ---

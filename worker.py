@@ -13,6 +13,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import config
+import breaking
 import db
 import export
 import feeds
@@ -190,7 +191,8 @@ def write_pending(conn, now):
            WHERE status='active' AND n_sources >= ?
              AND (ai_sources_count IS NULL OR n_sources > ai_sources_count)
              AND (ai_written_at IS NULL OR ai_written_at < ?)
-           ORDER BY relevance DESC LIMIT ?""",
+           ORDER BY (breaking_at IS NOT NULL AND ai_written_at IS NULL) DESC,  -- última hora sin redactar primero
+                    relevance DESC LIMIT ?""",
         (config.AI_MIN_SOURCES, now - config.AI_MIN_INTERVAL_MIN * 60, config.AI_MAX_PER_CYCLE)).fetchall()
     done = 0
     for row in pending:
@@ -252,6 +254,7 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None, telegram_inline=True):
     items = new_items(conn, results, now)
     stats = cluster_items(conn, items, now) if items else {"new": 0, "joined": 0, "merged": 0}
     refresh_clusters(conn, now)
+    stats["breaking"] = breaking.detect(conn, now)
     try:
         stats["intl"] = intl.process(conn, now)
     except Exception:
@@ -268,8 +271,8 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None, telegram_inline=True):
     stats["feeds"] = len(results)
     stats["seconds"] = round(time.time() - t0, 1)
     log.info("Ciclo: %d artículos nuevos -> %d noticias nuevas, %d añadidos a existentes, %d fusiones, "
-             "%d redactadas, %d artículos internacionales, %d mensajes a Telegram · feeds %d/%d · %.1fs", len(items), stats["new"],
-             stats["joined"], stats["merged"], stats["ai_written"], stats["intl"], stats["telegram"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
+             "%d redactadas, %d de última hora, %d artículos internacionales, %d mensajes a Telegram · feeds %d/%d · %.1fs", len(items), stats["new"],
+             stats["joined"], stats["merged"], stats["ai_written"], stats["breaking"], stats["intl"], stats["telegram"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
     return stats
 
 

@@ -93,8 +93,12 @@
   .evo .quote { font-family: var(--serif); font-size: 15.5px; color: var(--muted); margin-top: 2px; }
   .evo .ia { font-size: 10px; font-weight: 700; letter-spacing: .05em; color: var(--accent); border: 1px solid var(--accent);
              border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+  .badge.single { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .bk { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+        text-transform: uppercase; color: var(--accent); }
   .empty { text-align: center; color: var(--muted); padding: 80px 20px; }
   .detail { max-width: 760px; margin: 0 auto; }
+  .detail .bk { display: flex; margin: 0 0 8px 4px; }
   .back { display: inline-block; margin-bottom: 18px; color: var(--muted); text-decoration: none; font-size: 14px; cursor: pointer; }
   .detail h1 { font-family: var(--serif); font-size: 40px; line-height: 1.12; margin: 0 0 12px; letter-spacing: -0.3px; }
   .detail .lead { font-family: var(--serif); font-size: 21px; color: var(--muted); margin: 0 0 18px; }
@@ -143,6 +147,11 @@
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const TICKS = '<svg class="ticks" viewBox="0 0 18 12" aria-hidden="true"><path d="M1.5 6.5l3.2 3.2L11 2.5M7.6 9.2l.5.5L16.5 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const TICK1 = '<svg class="ticks" viewBox="0 0 18 12" aria-hidden="true"><path d="M3.5 6.5l3.2 3.2L13 2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// ✓ un medio (sin confirmar) · ✓✓ confirmada por varios medios, como en WhatsApp
+const badge = (n, extra = "") => n > 1
+  ? `<span class="badge">${TICKS}${n} medios${extra}</span>`
+  : `<span class="badge single" title="Pendiente de confirmar por otros medios">${TICK1}1 medio · sin confirmar</span>`;
 const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
 const fold = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const state = { min: 2, hours: 48, q: "" };
@@ -180,10 +189,11 @@ function card(s, i) {
   return `<a class="card ${i === 0 ? "lead" : ""}" href="#/noticia/${s.id}">
     ${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
     <div class="in">
+      ${s.breaking ? `<span class="bk"><span class="pulse"></span>Última hora</span>` : ""}
       <h2>${esc(s.headline)}</h2>
       ${s.lead ? `<p>${esc(s.lead)}</p>` : ""}
       <div class="foot">
-        <span class="badge">${s.n_sources > 1 ? TICKS : ""}${s.n_sources} ${s.n_sources === 1 ? "medio" : "medios"}</span>
+        ${badge(s.n_sources)}
         ${shown.map(x => `<span class="chip">${esc(x)}</span>`).join("")}
         ${more > 0 ? `<span>+${more}</span>` : ""}
         ${(s.intl || []).length ? `<span class="chip world" title="Cobertura internacional">${s.intl.map(c => c.flag).join(" ")}</span>` : ""}
@@ -195,7 +205,7 @@ function card(s, i) {
 // Noticias "en desarrollo": las que más artículos nuevos han recibido en las últimas 2 horas.
 function hotStrip() {
   const hot = DATA.stories
-    .filter(s => s.n_sources >= 2 && (s.recent_articles || 0) >= 2)
+    .filter(s => (s.n_sources >= 2 && (s.recent_articles || 0) >= 2) || (s.breaking && (s.recent_articles || 0) >= 1))
     .sort((a, b) => (b.recent_sources - a.recent_sources) || (b.recent_articles - a.recent_articles) || (b.relevance - a.relevance))
     .slice(0, 10);
   if (!hot.length) return "";
@@ -210,8 +220,11 @@ function renderList() {
   $("#bar").style.display = "";
   document.title = "DobleCheck · Noticias contrastadas en todos los medios";
   const since = Date.now() / 1000 - state.hours * 3600, q = fold(state.q.trim());
-  const list = DATA.stories.filter(s => s.n_sources >= state.min && s.last_published >= since &&
+  // última hora: aparece aunque la tenga un solo medio, y las de las 2 últimas horas van arriba
+  const pinned = s => s.breaking && s.last_published >= Date.now() / 1000 - 2 * 3600;
+  const list = DATA.stories.filter(s => (s.n_sources >= state.min || (s.breaking && state.min <= 2)) && s.last_published >= since &&
     (!q || fold(s.headline + " " + s.lead + " " + s.articles.map(a => a.title).join(" ")).includes(q)));
+  list.sort((a, b) => (pinned(b) - pinned(a)) || (pinned(a) && pinned(b) ? b.last_published - a.last_published : 0));
   $("#app").innerHTML = DATA.error
     ? `<div class="empty">Aún no hay datos. El robot los publicará en su próxima pasada.</div>`
     : list.length
@@ -274,10 +287,11 @@ function renderStory(id) {
   const pending = s.articles.filter(a => a.new_since_ai).length;
   $("#app").innerHTML = `<article class="detail">
     <a class="back" href="#/">← Portada</a>
+    <div>${s.breaking ? `<span class="bk"><span class="pulse"></span>Última hora</span>` : ""}</div>
     <h1>${esc(s.headline)}</h1>
     ${s.lead ? `<p class="lead">${esc(s.lead)}</p>` : ""}
     <div class="foot" style="margin-bottom:8px">
-      <span class="badge">${TICKS}${s.n_sources} medios</span><span>${s.n_articles} artículos</span>
+      ${badge(s.n_sources)}<span>${s.n_articles} ${s.n_articles === 1 ? "artículo" : "artículos"}</span>
       <span>· primera publicación ${hhmm(s.first_published)}</span><span>· última ${ago(s.last_published)}</span>
     </div>
     ${evolution(s)}
@@ -285,7 +299,9 @@ function renderStory(id) {
     <div class="body">${body}</div>
     <div class="note">${s.ai_written
       ? `Texto redactado automáticamente con IA a partir de ${s.ai_sources_count} medios · ${ago(s.ai_written_at)}.${pending ? ` Hay ${pending} artículo(s) nuevo(s) desde entonces; el texto se actualizará en breve.` : ""}`
-      : `Mostrando el titular original del medio más representativo. El texto se redactará cuando haya al menos 2 medios.`}</div>
+      : s.n_sources === 1
+        ? `Noticia de última hora publicada por un solo medio (${esc(s.sources[0])}), pendiente de confirmar. Cuando otros medios la confirmen se redactará y pasará a ✓✓.`
+        : `Mostrando el titular original del medio más representativo. El texto se redactará en breve.`}</div>
     <h3>Cobertura por medio</h3>
     <ul class="timeline">${s.articles.map(a => `<li>
       <time>${hhmm(a.published_at)}</time>
