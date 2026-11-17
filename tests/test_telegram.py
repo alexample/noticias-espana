@@ -16,9 +16,11 @@ NOW = 1_800_000_000
 class FakeSender:
     def __init__(self):
         self.sent = []
+        self.previews = []
 
-    def __call__(self, text, reply_to=None):
+    def __call__(self, text, reply_to=None, preview_url=None):
         self.sent.append((text, reply_to))
+        self.previews.append(preview_url)
         return 100 + len(self.sent)
 
 
@@ -51,7 +53,8 @@ class TestTelegram(unittest.TestCase):
         f = FakeSender()
         worker.publish_telegram(self.conn, NOW, fresh_db=False, sender=f)
         self.assertEqual(len(f.sent), 3)
-        self.assertIn("ejemplo.github.io/noticias/#/noticia/5", f.sent[0][0])
+        self.assertIn("ejemplo.github.io/noticias/n/5.html", f.sent[0][0])
+        self.assertEqual(f.previews[0], "https://ejemplo.github.io/noticias/n/5.html")
         # siguiente ciclo: nada nuevo
         worker.publish_telegram(self.conn, NOW + 900, fresh_db=False, sender=f)
         self.assertEqual(len(f.sent), 3)
@@ -76,10 +79,36 @@ class TestTelegram(unittest.TestCase):
         self.assertEqual(len(f.sent), 2)
         text, reply = f.sent[-1]
         self.assertEqual(reply, msg_id)
+        self.assertIsNone(f.previews[-1])  # las respuestas no repiten la miniatura
         self.assertIn("Dimite el consejero.", text)
         # sin novedades nuevas no se repite
         worker.publish_telegram(self.conn, NOW + 6000, fresh_db=False, sender=f)
         self.assertEqual(len(f.sent), 2)
+
+    def test_espera_a_que_su_pagina_este_publicada(self):
+        self.story(1, 5, relevance=5, written=NOW + 30)  # redactada en esta misma pasada
+        f = FakeSender()
+        worker.publish_telegram(self.conn, NOW, fresh_db=False, sender=f)
+        self.assertEqual(f.sent, [])
+        worker.publish_telegram(self.conn, NOW + 900, fresh_db=False, sender=f)
+        self.assertEqual(len(f.sent), 1)
+
+    def test_paginas_para_compartir(self):
+        import export
+        self.story(1, 5, relevance=5, headline='Titular con "comillas" <y> etiquetas')
+        self.conn.execute("UPDATE clusters SET image='https://img.example/foto.jpg' WHERE id=1")
+        self.conn.execute("INSERT INTO clusters(id, created_at, updated_at, status, merged_into) VALUES (2,?,?, 'merged', 1)",
+                          (NOW, __import__("time").time()))
+        self.conn.execute("UPDATE clusters SET last_published=? WHERE id=1", (__import__("time").time(),))
+        self.conn.commit()
+        d = os.path.join(tempfile.mkdtemp(), "n")
+        self.assertEqual(export.write_share_pages(self.conn, d, "https://ejemplo.github.io/noticias/"), 2)
+        page = open(os.path.join(d, "1.html"), encoding="utf-8").read()
+        self.assertIn('og:title" content="Titular con &quot;comillas&quot; &lt;y&gt; etiquetas"', page)
+        self.assertIn('og:image" content="https://img.example/foto.jpg"', page)
+        self.assertIn("#/noticia/1", page)
+        merged = open(os.path.join(d, "2.html"), encoding="utf-8").read()
+        self.assertIn("#/noticia/1", merged)  # una noticia fusionada lleva a la que la absorbió
 
     def test_base_de_datos_nueva_no_inunda_el_canal(self):
         for cid in range(1, 6):
@@ -92,7 +121,7 @@ class TestTelegram(unittest.TestCase):
     def test_limite_de_telegram_no_rompe_el_ciclo(self):
         self.story(1, 5, relevance=5)
 
-        def limited(text, reply_to=None):
+        def limited(text, reply_to=None, preview_url=None):
             raise telegram.RateLimited("retry_after 30")
         self.assertEqual(worker.publish_telegram(self.conn, NOW, fresh_db=False, sender=limited), 0)
         f = FakeSender()

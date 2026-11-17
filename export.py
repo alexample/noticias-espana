@@ -3,6 +3,7 @@
   docs/data/stories.json  noticias de las últimas horas con sus artículos
   docs/data/status.json   estado de los medios
 """
+import html
 import json
 import os
 import time
@@ -76,6 +77,67 @@ def build_timeline(articles, updates=(), foreign=(), countries=None):
     if len(events) > MAX_EVENTS:  # se conservan el origen y lo más reciente
         events = events[:MAX_EVENTS - 3] + events[-3:]
     return events
+
+
+PAGE = """<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<title>{title} · Al·Día</title>
+<meta name="description" content="{desc}">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Al·Día">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{desc}">
+<meta property="og:image" content="{image}">
+<meta property="og:url" content="{url}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{title}">
+<meta name="twitter:description" content="{desc}">
+<meta name="twitter:image" content="{image}">
+<link rel="canonical" href="{url}">
+<meta http-equiv="refresh" content="0; url={target}">
+<script>location.replace({target_js});</script>
+</head><body><p><a href="{target}">{title}</a></p></body></html>
+"""
+
+
+def write_share_pages(conn, pages_dir, site_url, days=7):
+    """Una página pequeña por noticia (pages_dir/<id>.html) con las etiquetas Open Graph
+    que leen Telegram, WhatsApp o X para mostrar la miniatura; al abrirla redirige a la
+    noticia en la web. Se generan las de los últimos días para que los enlaces ya
+    compartidos sigan funcionando."""
+    os.makedirs(pages_dir, exist_ok=True)
+    since = time.time() - days * 86400
+    rows = conn.execute(
+        """SELECT c.id, c.status, c.merged_into, c.headline, c.lead, c.image, a.title AS rep_title, a.summary AS rep_summary
+           FROM clusters c LEFT JOIN articles a ON a.id = c.rep_article_id
+           WHERE (c.status != 'merged' AND c.n_sources >= 2 AND c.last_published >= ?)
+              OR (c.status = 'merged' AND c.updated_at >= ?)""", (since, since)).fetchall()
+    by_id = {r["id"]: r for r in rows}
+    n = 0
+    for r in rows:
+        target_id = r["id"]
+        hops = 0
+        while by_id.get(target_id) is not None and by_id[target_id]["status"] == "merged" and hops < 10:
+            target_id, hops = by_id[target_id]["merged_into"], hops + 1
+        t = by_id.get(target_id) or r
+        title = t["headline"] or t["rep_title"] or "Al·Día"
+        desc = (t["lead"] or t["rep_summary"] or "Noticias de todos los medios").strip()[:280]
+        image = t["image"] if (t["image"] or "").startswith("http") else site_url + "og.png"
+        target = f"{site_url}#/noticia/{target_id}"
+        page = PAGE.format(
+            title=html.escape(title), desc=html.escape(desc), image=html.escape(image),
+            url=html.escape(f"{site_url}n/{r['id']}.html"), target=html.escape(target),
+            target_js=json.dumps(target))
+        _write_text(os.path.join(pages_dir, f"{r['id']}.html"), page)
+        n += 1
+    return n
+
+
+def _write_text(path, text):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, path)
 
 
 def export_static(conn, out_dir=None, hours=48, limit=400):
@@ -158,6 +220,7 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
     merged = {str(r["id"]): r["merged_into"] for r in conn.execute(
         "SELECT id, merged_into FROM clusters WHERE status='merged' AND updated_at >= ?", (now - hours * 3600,))}
     _write(os.path.join(out_dir, "stories.json"), {"generated_at": now, "stories": stories, "merged": merged})
+    write_share_pages(conn, os.path.join(os.path.dirname(os.path.abspath(out_dir)), "n"), config.SITE_URL)
 
     srcs = [dict(r) for r in conn.execute(
         "SELECT name, last_fetch, last_status, last_items FROM sources WHERE enabled=1 ORDER BY name")]

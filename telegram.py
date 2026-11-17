@@ -23,14 +23,17 @@ class RateLimited(Exception):
     pass
 
 
-def send(text, reply_to=None):
+def send(text, reply_to=None, preview_url=None):
     """Envía un mensaje al canal. Devuelve el message_id."""
     payload = {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "text": text,
         "parse_mode": "HTML",
-        "link_preview_options": {"is_disabled": True},
     }
+    if preview_url:  # miniatura grande con el titular y la foto (página n/<id>.html)
+        payload["link_preview_options"] = {"url": preview_url, "prefer_large_media": True}
+    else:
+        payload["link_preview_options"] = {"is_disabled": True}
     if reply_to:
         payload["reply_parameters"] = {"message_id": reply_to, "allow_sending_without_reply": True}
     req = urllib.request.Request(
@@ -55,8 +58,12 @@ def _e(s):
     return html.escape(s or "", quote=False)
 
 
+def page_url(cid):
+    return f"{config.SITE_URL}n/{cid}.html"
+
+
 def _link(cid):
-    return f'<a href="{config.SITE_URL}#/noticia/{cid}">Leer en Al·Día →</a>'
+    return f'<a href="{page_url(cid)}">Leer en Al·Día →</a>'
 
 
 def _media_line(sources):
@@ -125,10 +132,12 @@ def process(conn, now, sender=None, countries=None):
             """SELECT c.* FROM clusters c LEFT JOIN telegram_posts t ON t.cluster_id = c.id
                WHERE t.cluster_id IS NULL AND c.status='active' AND c.n_sources >= ?
                  AND c.headline IS NOT NULL AND c.last_published >= ?
+                 AND c.ai_written_at < ?   -- redactada en una pasada anterior: su página ya está publicada
                ORDER BY c.relevance DESC LIMIT ?""",
-            (config.TELEGRAM_MIN_SOURCES, now - 6 * 3600, config.TELEGRAM_MAX_NEW_PER_CYCLE)).fetchall()
+            (config.TELEGRAM_MIN_SOURCES, now - 6 * 3600, now, config.TELEGRAM_MAX_NEW_PER_CYCLE)).fetchall()
         for c in rows:
-            msg_id = sender(format_new(c, _sources(conn, c["id"]), _flags(conn, c["id"], countries)))
+            msg_id = sender(format_new(c, _sources(conn, c["id"]), _flags(conn, c["id"], countries)),
+                            preview_url=page_url(c["id"]))
             # last_update_at = ai_written_at: las novedades anteriores ya están en el mensaje
             conn.execute("INSERT INTO telegram_posts VALUES (?,?,?,?)", (c["id"], msg_id, now, c["ai_written_at"] or now))
             conn.commit()
