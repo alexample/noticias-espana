@@ -26,7 +26,7 @@ PROMPT = """Estos son los artículos que distintos medios han publicado sobre la
 
 {sources}
 
-Redacta la noticia. Devuelve SOLO un objeto JSON válido con estas claves:
+Redacta la noticia. Si algún medio solo aporta el titular, redacta igualmente con lo que dicen los titulares (el cuerpo puede ser más breve, de 1-2 párrafos). Devuelve SIEMPRE y SOLO un objeto JSON válido con estas claves:
 - "etiqueta": el tema en 1-3 palabras, como lo rotularía una portada (p. ej. "DANA Valencia", "Presupuestos 2027", "Cumbre OTAN"). Sin verbos ni artículos.
 - "titular": máximo 14 palabras, informativo, sin clickbait.
 - "entradilla": 1-2 frases con lo esencial (qué, quién, cuándo, dónde).
@@ -45,7 +45,7 @@ def _fmt_sources(articles):
     lines = []
     for a in articles:
         ts = datetime.fromtimestamp(a["published_at"], tz=timezone.utc).strftime("%d/%m %H:%M UTC")
-        summary = (a["summary"] or "").strip()[:500]
+        summary = (a["summary"] or "").strip()[:500] or "(no disponible: usa solo el titular)"
         lines.append(f"[{a['source']} · {ts}]\nTitular: {a['title']}\nExtracto: {summary}")
     return "\n\n".join(lines)
 
