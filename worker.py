@@ -223,16 +223,19 @@ def write_pending(conn, now):
 
 # ---------------------------------------------------------------- telegram
 
-def publish_telegram(conn, now, fresh_db, sender=None):
-    if not (telegram.enabled() or sender):
-        return 0
+def publish_telegram(conn, now, fresh_db=False, sender=None, written_before=None):
+    """written_before: solo noticias redactadas antes de ese momento (cuya página para
+    compartir ya está en la web). En GitHub Actions no hace falta: Telegram se publica en
+    un paso aparte, justo después de desplegar la web (python worker.py --telegram)."""
     if fresh_db:
         telegram.mark_existing(conn, now, keep=0)   # caché perdida: no repetir lo ya publicado
+        return 0
+    if not (telegram.enabled() or sender):
         return 0
     if conn.execute("SELECT COUNT(*) FROM telegram_posts").fetchone()[0] == 0:
         telegram.mark_existing(conn, now, keep=3)   # canal recién activado: empieza con las 3 principales
     try:
-        new, upd = telegram.process(conn, now, sender=sender)
+        new, upd = telegram.process(conn, now, sender=sender, written_before=written_before)
     except Exception:
         log.exception("Telegram falló")
         return 0
@@ -241,7 +244,7 @@ def publish_telegram(conn, now, fresh_db, sender=None):
 
 # ---------------------------------------------------------------- ciclo
 
-def run_cycle(conn, fetcher=feeds.fetch_source, now=None):
+def run_cycle(conn, fetcher=feeds.fetch_source, now=None, telegram_inline=True):
     t0 = time.time()
     now = now or time.time()
     fresh_db = conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0] == 0
@@ -255,9 +258,12 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None):
         log.exception("Cobertura internacional falló")
         stats["intl"] = 0
     stats["ai_written"] = write_pending(conn, now)
-    stats["telegram"] = publish_telegram(conn, now, fresh_db)
     export.prune(conn, config.PRUNE_DAYS)
     stats["exported"] = export.export_static(conn)
+    if telegram_inline:
+        stats["telegram"] = publish_telegram(conn, now, fresh_db, written_before=now)
+    else:  # se publicará en otro paso tras desplegar la web; aquí solo se protege una BD nueva
+        stats["telegram"] = publish_telegram(conn, now, fresh_db) if fresh_db else 0
     stats["feeds_ok"] = sum(1 for r in results if not r["status"].startswith("error"))
     stats["feeds"] = len(results)
     stats["seconds"] = round(time.time() - t0, 1)
@@ -277,6 +283,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--check-feeds", action="store_true")
+    ap.add_argument("--no-telegram", action="store_true", help="no publicar en Telegram en este ciclo")
+    ap.add_argument("--telegram", action="store_true", help="solo publicar en Telegram (tras desplegar la web)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -286,11 +294,15 @@ def main():
     db.sync_sources(conn)
     if args.check_feeds:
         return check_feeds(conn)
+    if args.telegram:
+        n = publish_telegram(conn, time.time())
+        log.info("Telegram: %d mensajes", n)
+        return
     if not writer.ai_enabled():
         log.warning("ANTHROPIC_API_KEY no definida: las noticias se mostrarán con el titular original.")
     while True:
         try:
-            run_cycle(conn)
+            run_cycle(conn, telegram_inline=not args.no_telegram)
         except Exception:
             log.exception("Error en el ciclo")
         if args.once:

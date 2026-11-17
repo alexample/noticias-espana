@@ -54,12 +54,30 @@ jobs:
         env:
           # Secreto opcional: sin él la web muestra el titular original de cada medio.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          export NEWS_SITE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+          python worker.py --once --no-telegram
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # Telegram se publica justo después de desplegar: así la página de cada noticia
+      # (con su miniatura) ya está en la web cuando Telegram la consulta, sin retraso.
+      - name: Publicar en Telegram
+        env:
           # Canal de Telegram (opcional): sin estos secretos no se publica nada
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           export NEWS_SITE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
-          python worker.py --once
+          sleep 15   # margen para que la CDN de GitHub Pages sirva lo recién desplegado
+          python worker.py --telegram
 
       - name: Compactar base de datos
         if: always() && hashFiles('data/noticias.db') != ''
@@ -74,14 +92,6 @@ jobs:
           path: data/noticias.db
           key: noticias-db-${{ github.run_id }}
 
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-
-      - id: deploy
-        uses: actions/deploy-pages@v4
 
       # GitHub desactiva las tareas programadas de un repositorio tras 60 días sin
       # commits. Una vez por semana se guarda un archivo diminuto para evitarlo.

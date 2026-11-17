@@ -114,7 +114,7 @@ def mark_existing(conn, now, keep=0):
     conn.commit()
 
 
-def process(conn, now, sender=None, countries=None):
+def process(conn, now, sender=None, countries=None, written_before=None):
     """Publica noticias nuevas y actualizaciones. Devuelve (nuevas, actualizaciones)."""
     if not enabled() and sender is None:
         return 0, 0
@@ -132,9 +132,10 @@ def process(conn, now, sender=None, countries=None):
             """SELECT c.* FROM clusters c LEFT JOIN telegram_posts t ON t.cluster_id = c.id
                WHERE t.cluster_id IS NULL AND c.status='active' AND c.n_sources >= ?
                  AND c.headline IS NOT NULL AND c.last_published >= ?
-                 AND c.ai_written_at < ?   -- redactada en una pasada anterior: su página ya está publicada
+                 AND (? IS NULL OR c.ai_written_at < ?)   -- su página para compartir ya está en la web
                ORDER BY c.relevance DESC LIMIT ?""",
-            (config.TELEGRAM_MIN_SOURCES, now - 6 * 3600, now, config.TELEGRAM_MAX_NEW_PER_CYCLE)).fetchall()
+            (config.TELEGRAM_MIN_SOURCES, now - 6 * 3600, written_before, written_before,
+             config.TELEGRAM_MAX_NEW_PER_CYCLE)).fetchall()
         for c in rows:
             msg_id = sender(format_new(c, _sources(conn, c["id"]), _flags(conn, c["id"], countries)),
                             preview_url=page_url(c["id"]))

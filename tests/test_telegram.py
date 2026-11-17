@@ -86,11 +86,12 @@ class TestTelegram(unittest.TestCase):
         self.assertEqual(len(f.sent), 2)
 
     def test_espera_a_que_su_pagina_este_publicada(self):
+        # modo integrado (sin paso aparte tras el despliegue): espera a la pasada siguiente
         self.story(1, 5, relevance=5, written=NOW + 30)  # redactada en esta misma pasada
         f = FakeSender()
-        worker.publish_telegram(self.conn, NOW, fresh_db=False, sender=f)
+        worker.publish_telegram(self.conn, NOW, fresh_db=False, sender=f, written_before=NOW)
         self.assertEqual(f.sent, [])
-        worker.publish_telegram(self.conn, NOW + 900, fresh_db=False, sender=f)
+        worker.publish_telegram(self.conn, NOW + 900, fresh_db=False, sender=f, written_before=NOW + 900)
         self.assertEqual(len(f.sent), 1)
 
     def test_paginas_para_compartir(self):
@@ -109,6 +110,12 @@ class TestTelegram(unittest.TestCase):
         self.assertIn("#/noticia/1", page)
         merged = open(os.path.join(d, "2.html"), encoding="utf-8").read()
         self.assertIn("#/noticia/1", merged)  # una noticia fusionada lleva a la que la absorbió
+
+    def test_paso_tras_desplegar_publica_lo_recien_redactado(self):
+        self.story(1, 5, relevance=5, written=NOW + 30)
+        f = FakeSender()
+        worker.publish_telegram(self.conn, NOW + 60, sender=f)  # python worker.py --telegram
+        self.assertEqual(len(f.sent), 1)
 
     def test_base_de_datos_nueva_no_inunda_el_canal(self):
         for cid in range(1, 6):
