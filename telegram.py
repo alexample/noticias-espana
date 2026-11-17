@@ -116,8 +116,12 @@ def format_confirmed(story, sources):
 
 
 def format_update(story, note, n_sources):
-    return "\n".join([_header("Actualización", n_sources), "",
-                      f"🔄 <b>{_e(note)}</b>", "", f"✅ Ya la confirman {n_sources} medios", "", _link(story["id"])])
+    """Actualización: titular de la noticia (versión más reciente) y la novedad."""
+    lines = [_header("Actualización", n_sources), ""]
+    if story["headline"]:
+        lines += [f"🗞 <b>{_e(story['headline'])}</b>", ""]
+    lines += [f"🔄 {_e(note)}", "", f"✅ Ya la confirman {n_sources} medios", "", _link(story["id"])]
+    return "\n".join(lines)
 
 
 def _sources(conn, cid):

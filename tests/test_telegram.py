@@ -81,6 +81,7 @@ class TestTelegram(unittest.TestCase):
         self.assertEqual(reply, msg_id)
         self.assertIsNone(f.previews[-1])  # las respuestas no repiten la miniatura
         self.assertIn("Dimite el consejero.", text)
+        self.assertIn("🗞 <b>Titular</b>", text)  # el titular de la noticia encabeza la actualización
         # sin novedades nuevas no se repite
         worker.publish_telegram(self.conn, NOW + 6000, fresh_db=False, sender=f)
         self.assertEqual(len(f.sent), 2)
