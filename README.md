@@ -109,6 +109,18 @@ noticia, en esa misma llamada (sin coste extra) devuelve una frase con la noveda
 a la versión anterior; si no hay nada sustancial, no se añade al timeline. Las versiones
 se guardan en la tabla `story_updates`.
 
+### 7. Canal de Telegram (`telegram.py`)
+Sin IA adicional: reutiliza lo que ya redacta la IA.
+- Cuando una noticia alcanza 4 medios (`TELEGRAM_MIN_SOURCES`) se publica titular,
+  entradilla, medios que la cubren, banderas de la prensa extranjera y enlace a la web.
+- Cada novedad que la IA detecta se publica como **respuesta** al mensaje original
+  (como mucho una por noticia cada 30 min).
+- Límites: 3 noticias nuevas y 4 actualizaciones por pasada. Al activar el canal se
+  publican solo las 3 principales; si se pierde la base de datos no se repite nada.
+
+Configuración: crear un bot con @BotFather, añadirlo como administrador del canal y
+guardar en GitHub los secretos `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` (`@nombre_del_canal`).
+
 ## Configuración (variables de entorno)
 
 | variable | por defecto | |

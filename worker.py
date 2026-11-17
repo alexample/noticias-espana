@@ -17,6 +17,7 @@ import db
 import export
 import feeds
 import intl
+import telegram
 import writer
 from clustering import Cluster, Corpus, Matcher, vectorize
 from textproc import article_features, fold
@@ -131,6 +132,8 @@ def cluster_items(conn, items, now):
         conn.execute("UPDATE OR IGNORE intl_articles SET cluster_id=? WHERE cluster_id=?", (dst, src))
         conn.execute("DELETE FROM intl_articles WHERE cluster_id=?", (src,))
         conn.execute("UPDATE story_updates SET cluster_id=? WHERE cluster_id=?", (dst, src))
+        conn.execute("UPDATE OR IGNORE telegram_posts SET cluster_id=? WHERE cluster_id=?", (dst, src))
+        conn.execute("DELETE FROM telegram_posts WHERE cluster_id=?", (src,))
         conn.execute("UPDATE clusters SET status='merged', merged_into=? WHERE id=?", (dst, src))
         conn.execute("UPDATE clusters SET updated_at=? WHERE id=?", (now, dst))
     stats["merged"] = len(merges)
@@ -218,11 +221,30 @@ def write_pending(conn, now):
     return done
 
 
+# ---------------------------------------------------------------- telegram
+
+def publish_telegram(conn, now, fresh_db, sender=None):
+    if not (telegram.enabled() or sender):
+        return 0
+    if fresh_db:
+        telegram.mark_existing(conn, now, keep=0)   # caché perdida: no repetir lo ya publicado
+        return 0
+    if conn.execute("SELECT COUNT(*) FROM telegram_posts").fetchone()[0] == 0:
+        telegram.mark_existing(conn, now, keep=3)   # canal recién activado: empieza con las 3 principales
+    try:
+        new, upd = telegram.process(conn, now, sender=sender)
+    except Exception:
+        log.exception("Telegram falló")
+        return 0
+    return new + upd
+
+
 # ---------------------------------------------------------------- ciclo
 
 def run_cycle(conn, fetcher=feeds.fetch_source, now=None):
     t0 = time.time()
     now = now or time.time()
+    fresh_db = conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0] == 0
     results = fetch_all(conn, fetcher)
     items = new_items(conn, results, now)
     stats = cluster_items(conn, items, now) if items else {"new": 0, "joined": 0, "merged": 0}
@@ -233,14 +255,15 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None):
         log.exception("Cobertura internacional falló")
         stats["intl"] = 0
     stats["ai_written"] = write_pending(conn, now)
+    stats["telegram"] = publish_telegram(conn, now, fresh_db)
     export.prune(conn, config.PRUNE_DAYS)
     stats["exported"] = export.export_static(conn)
     stats["feeds_ok"] = sum(1 for r in results if not r["status"].startswith("error"))
     stats["feeds"] = len(results)
     stats["seconds"] = round(time.time() - t0, 1)
     log.info("Ciclo: %d artículos nuevos -> %d noticias nuevas, %d añadidos a existentes, %d fusiones, "
-             "%d redactadas, %d artículos internacionales · feeds %d/%d · %.1fs", len(items), stats["new"],
-             stats["joined"], stats["merged"], stats["ai_written"], stats["intl"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
+             "%d redactadas, %d artículos internacionales, %d mensajes a Telegram · feeds %d/%d · %.1fs", len(items), stats["new"],
+             stats["joined"], stats["merged"], stats["ai_written"], stats["intl"], stats["telegram"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
     return stats
 
 

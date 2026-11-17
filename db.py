@@ -83,6 +83,14 @@ CREATE TABLE IF NOT EXISTS story_updates (
     n_sources   INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_updates_cluster ON story_updates(cluster_id);
+
+-- Mensajes publicados en el canal de Telegram (para responder con actualizaciones)
+CREATE TABLE IF NOT EXISTS telegram_posts (
+    cluster_id      INTEGER PRIMARY KEY,
+    message_id      INTEGER,          -- NULL = marcada como ya vista, sin publicar
+    posted_at       REAL NOT NULL,
+    last_update_at  REAL NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_articles_pub ON articles(published_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_source_title ON articles(source, title_key);
 """

@@ -176,6 +176,8 @@ def prune(conn, days=7):
                  "AND fetched_at < ?", (cutoff,))
     conn.execute("DELETE FROM story_updates WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "
                  "AND at < ?", (cutoff,))
+    conn.execute("DELETE FROM telegram_posts WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "
+                 "AND posted_at < ?", (cutoff,))
     conn.execute("""DELETE FROM clusters WHERE status != 'active' AND updated_at < ?
                     AND id NOT IN (SELECT DISTINCT cluster_id FROM articles WHERE cluster_id IS NOT NULL)""",
                  (cutoff,))

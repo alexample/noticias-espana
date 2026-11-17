@@ -49,6 +49,15 @@ INTL_MAX_PER_CYCLE = _env("NEWS_INTL_MAX_PER_CYCLE", 4, int)  # limita peticione
 INTL_RECHECK_MIN = _env("NEWS_INTL_RECHECK_MIN", 60, int)     # cada cuánto se vuelve a buscar
 INTL_MAX_PER_COUNTRY = 6
 
+# --- Canal de Telegram ---
+TELEGRAM_BOT_TOKEN = _env("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = _env("TELEGRAM_CHAT_ID", "")              # "@nombre_del_canal" o id numérico
+TELEGRAM_MIN_SOURCES = _env("TELEGRAM_MIN_SOURCES", 4, int)  # medios mínimos para publicar una noticia
+TELEGRAM_MAX_NEW_PER_CYCLE = _env("TELEGRAM_MAX_NEW_PER_CYCLE", 3, int)
+TELEGRAM_MAX_UPDATES_PER_CYCLE = _env("TELEGRAM_MAX_UPDATES_PER_CYCLE", 4, int)
+TELEGRAM_UPDATE_EVERY_MIN = _env("TELEGRAM_UPDATE_EVERY_MIN", 30, int)  # por noticia
+SITE_URL = _env("NEWS_SITE_URL", "https://alexample.github.io/noticias-espana/")
+
 # --- Web ---
 HOST = _env("NEWS_HOST", "0.0.0.0")
 PORT = _env("NEWS_PORT", 8000, int)

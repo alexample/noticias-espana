@@ -54,7 +54,12 @@ jobs:
         env:
           # Secreto opcional: sin él la web muestra el titular original de cada medio.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python worker.py --once
+          # Canal de Telegram (opcional): sin estos secretos no se publica nada
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          export NEWS_SITE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+          python worker.py --once
 
       - name: Compactar base de datos
         if: always() && hashFiles('data/noticias.db') != ''
