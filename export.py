@@ -81,10 +81,10 @@ def build_timeline(articles, updates=(), foreign=(), countries=None):
 
 PAGE = """<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
-<title>{title} · Al·Día</title>
+<title>{title} · DobleCheck</title>
 <meta name="description" content="{desc}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="Al·Día">
+<meta property="og:site_name" content="DobleCheck">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{desc}">
 <meta property="og:image" content="{image}">
@@ -120,7 +120,7 @@ def write_share_pages(conn, pages_dir, site_url, days=7):
         while by_id.get(target_id) is not None and by_id[target_id]["status"] == "merged" and hops < 10:
             target_id, hops = by_id[target_id]["merged_into"], hops + 1
         t = by_id.get(target_id) or r
-        title = t["headline"] or t["rep_title"] or "Al·Día"
+        title = t["headline"] or t["rep_title"] or "DobleCheck"
         desc = (t["lead"] or t["rep_summary"] or "Noticias de todos los medios").strip()[:280]
         image = t["image"] if (t["image"] or "").startswith("http") else site_url + "og.png"
         target = f"{site_url}#/noticia/{target_id}"

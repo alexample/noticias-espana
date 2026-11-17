@@ -63,7 +63,7 @@ class TestTelegram(unittest.TestCase):
         worker.publish_telegram(self.conn, NOW + 1800, fresh_db=False, sender=f)
         self.assertEqual(len(f.sent), 4)
         self.assertIn("Nueva &lt;b&gt;gorda&lt;/b&gt;", f.sent[-1][0])
-        self.assertIn("📰 4 medios: Medio 0, Medio 1, Medio 2, Medio 3", f.sent[-1][0])
+        self.assertIn("✅ Confirmada por 4 medios: Medio 0, Medio 1, Medio 2, Medio 3", f.sent[-1][0])
 
     def test_actualizacion_responde_al_mensaje_original(self):
         self.story(1, 5, relevance=5)

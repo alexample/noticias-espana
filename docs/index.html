@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Al Día · Noticias de todos los medios</title>
+<title>DobleCheck · Noticias contrastadas en todos los medios</title>
 <meta name="description" content="Las noticias de todos los medios españoles, agrupadas y actualizadas cada 15 minutos.">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Al·Día">
-<meta property="og:title" content="Al·Día · Noticias de todos los medios">
+<meta property="og:site_name" content="DobleCheck">
+<meta property="og:title" content="DobleCheck · Noticias contrastadas en todos los medios">
 <meta property="og:description" content="Las noticias de todos los medios españoles, agrupadas y actualizadas cada 15 minutos.">
 <meta property="og:image" content="og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -15,13 +15,13 @@
 <style>
   :root {
     --bg: #f7f5f0; --paper: #fff; --ink: #161514; --muted: #6b6760; --line: #e3dfd6;
-    --accent: #b3261e; --chip: #efebe3; --new: #1f6f43;
+    --accent: #b3261e; --chip: #efebe3; --new: #1f6f43; --check: #1d9bd8;
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #141312; --paper: #1c1b19; --ink: #ece8e1; --muted: #a09a90; --line: #2e2c29;
-            --accent: #ff6b5e; --chip: #2a2825; --new: #5fc28a; }
+            --accent: #ff6b5e; --chip: #2a2825; --new: #5fc28a; --check: #53bdeb; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.45; }
@@ -29,8 +29,10 @@
   header { border-bottom: 3px double var(--line); background: var(--paper); }
   .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
   .masthead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 18px 0 10px; flex-wrap: wrap; }
-  .logo { font-family: var(--serif); font-size: 34px; font-weight: 700; letter-spacing: -0.5px; text-decoration: none; }
-  .logo span { color: var(--accent); }
+  .logo { font-family: var(--serif); font-size: 34px; font-weight: 400; letter-spacing: -0.5px; text-decoration: none; white-space: nowrap; }
+  .logo b { font-weight: 700; }
+  .logo .ticks { width: 34px; height: 23px; color: var(--check); margin-left: 6px; vertical-align: -1px; }
+  .badge .ticks { width: 15px; height: 10px; margin-right: 4px; vertical-align: 0; }
   .meta { font-size: 13px; color: var(--muted); }
   .bar { display: flex; gap: 10px; padding: 10px 0 14px; flex-wrap: wrap; align-items: center; }
   .bar input[type=search] { flex: 1; min-width: 200px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
@@ -52,7 +54,7 @@
   .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
   .card.lead p { font-size: 16px; }
   .foot { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
-  .badge { background: var(--accent); color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 600; }
+  .badge { background: var(--check); color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 600; }
   .chip { background: var(--chip); border-radius: 999px; padding: 2px 8px; }
   .hot { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 8px 0 18px 10px; margin: -6px 0 0 -10px; scrollbar-width: none; }
   .hot::-webkit-scrollbar { display: none; }
@@ -118,7 +120,7 @@
 <header>
   <div class="wrap">
     <div class="masthead">
-      <a class="logo" href="#/">Al<span>·</span>Día</a>
+      <a class="logo" href="#/" aria-label="DobleCheck">Doble<b>Check</b><svg class="ticks" viewBox="0 0 18 12" aria-hidden="true"><path d="M1.5 6.5l3.2 3.2L11 2.5M7.6 9.2l.5.5L16.5 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
       <div class="meta" id="meta">Cargando…</div>
     </div>
     <div class="bar" id="bar">
@@ -140,6 +142,7 @@
 // Funciona igual en GitHub Pages que con server.py.
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const TICKS = '<svg class="ticks" viewBox="0 0 18 12" aria-hidden="true"><path d="M1.5 6.5l3.2 3.2L11 2.5M7.6 9.2l.5.5L16.5 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
 const fold = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const state = { min: 2, hours: 48, q: "" };
@@ -180,7 +183,7 @@ function card(s, i) {
       <h2>${esc(s.headline)}</h2>
       ${s.lead ? `<p>${esc(s.lead)}</p>` : ""}
       <div class="foot">
-        <span class="badge">${s.n_sources} ${s.n_sources === 1 ? "medio" : "medios"}</span>
+        <span class="badge">${s.n_sources > 1 ? TICKS : ""}${s.n_sources} ${s.n_sources === 1 ? "medio" : "medios"}</span>
         ${shown.map(x => `<span class="chip">${esc(x)}</span>`).join("")}
         ${more > 0 ? `<span>+${more}</span>` : ""}
         ${(s.intl || []).length ? `<span class="chip world" title="Cobertura internacional">${s.intl.map(c => c.flag).join(" ")}</span>` : ""}
@@ -205,7 +208,7 @@ function hotStrip() {
 
 function renderList() {
   $("#bar").style.display = "";
-  document.title = "Al Día · Noticias de todos los medios";
+  document.title = "DobleCheck · Noticias contrastadas en todos los medios";
   const since = Date.now() / 1000 - state.hours * 3600, q = fold(state.q.trim());
   const list = DATA.stories.filter(s => s.n_sources >= state.min && s.last_published >= since &&
     (!q || fold(s.headline + " " + s.lead + " " + s.articles.map(a => a.title).join(" ")).includes(q)));
@@ -265,7 +268,7 @@ function renderStory(id) {
   if (DATA.merged[id]) { location.replace(`#/noticia/${DATA.merged[id]}`); return; }
   const s = DATA.stories.find(x => String(x.id) === String(id));
   if (!s) { $("#app").innerHTML = `<div class="empty">Noticia no encontrada o ya archivada. <a href="#/">Volver a la portada</a></div>`; return; }
-  document.title = `${s.headline} · Al Día`;
+  document.title = `${s.headline} · DobleCheck`;
   const img = safeUrl(s.image);
   const body = (s.body || "").split(/\n{2,}/).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
   const pending = s.articles.filter(a => a.new_since_ai).length;
@@ -274,7 +277,7 @@ function renderStory(id) {
     <h1>${esc(s.headline)}</h1>
     ${s.lead ? `<p class="lead">${esc(s.lead)}</p>` : ""}
     <div class="foot" style="margin-bottom:8px">
-      <span class="badge">${s.n_sources} medios</span><span>${s.n_articles} artículos</span>
+      <span class="badge">${TICKS}${s.n_sources} medios</span><span>${s.n_articles} artículos</span>
       <span>· primera publicación ${hhmm(s.first_published)}</span><span>· última ${ago(s.last_published)}</span>
     </div>
     ${evolution(s)}

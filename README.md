@@ -1,4 +1,4 @@
-# Al·Día — agregador de noticias de medios españoles
+# DobleCheck ✓✓ — noticias contrastadas en todos los medios españoles
 
 Una web que muestra las noticias más relevantes del momento, agrupando lo que
 publican ~30 medios españoles. Un **worker** lee sus RSS cada 5 minutos y un

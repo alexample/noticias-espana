@@ -63,13 +63,13 @@ def page_url(cid):
 
 
 def _link(cid):
-    return f'<a href="{page_url(cid)}">Leer en Al·Día →</a>'
+    return f'<a href="{page_url(cid)}">Leer en DobleCheck →</a>'
 
 
 def _media_line(sources):
     n = len(sources)
     names = ", ".join(sources[:4]) + (f" y {n - 4} más" if n > 4 else "")
-    return f"📰 {n} medios: {_e(names)}"
+    return f"✅ Confirmada por {n} medios: {_e(names)}"
 
 
 def format_new(story, sources, flags):
@@ -85,7 +85,7 @@ def format_new(story, sources, flags):
 
 def format_update(story, note, n_sources):
     return "\n".join([f"{_e(config.TELEGRAM_HEADER)}  ·  <i>Actualización</i>", "",
-                      f"🔄 <b>{_e(note)}</b>", "", f"📰 Ya son {n_sources} medios", "", _link(story["id"])])
+                      f"🔄 <b>{_e(note)}</b>", "", f"✅ Ya la confirman {n_sources} medios", "", _link(story["id"])])
 
 
 def _sources(conn, cid):

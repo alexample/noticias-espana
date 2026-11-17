@@ -22,7 +22,7 @@ FETCH_TIMEOUT = _env("NEWS_FETCH_TIMEOUT", 15, int)
 FETCH_THREADS = _env("NEWS_FETCH_THREADS", 12, int)
 MAX_ARTICLE_AGE_H = _env("NEWS_MAX_ARTICLE_AGE_H", 48, int)  # se ignoran artículos más antiguos
 CLUSTER_ACTIVE_H = _env("NEWS_CLUSTER_ACTIVE_H", 72, int)    # una noticia sin novedades en este tiempo se cierra
-USER_AGENT = "Mozilla/5.0 (compatible; AgregadorNoticiasES/1.0)"
+USER_AGENT = "Mozilla/5.0 (compatible; DobleCheckNoticias/1.0)"
 
 # --- Algoritmo de agrupación ---
 # Puntuación mínima para añadir un artículo a una noticia existente (0-1).
@@ -58,7 +58,7 @@ TELEGRAM_MAX_UPDATES_PER_CYCLE = _env("TELEGRAM_MAX_UPDATES_PER_CYCLE", 4, int)
 TELEGRAM_UPDATE_EVERY_MIN = _env("TELEGRAM_UPDATE_EVERY_MIN", 30, int)  # por noticia
 # Cabecera "de periódico" con letras góticas Unicode (Telegram no permite elegir fuente).
 # Estos alfabetos no tienen tildes ni ñ: por eso solo se usan en la cabecera, no en titulares.
-TELEGRAM_HEADER = _env("TELEGRAM_HEADER", "𝕬𝖑·𝕯𝖎𝖆")
+TELEGRAM_HEADER = _env("TELEGRAM_HEADER", "𝕯𝖔𝖇𝖑𝖊𝕮𝖍𝖊𝖈𝖐 ✓✓")
 SITE_URL = _env("NEWS_SITE_URL", "https://alexample.github.io/noticias-espana/")
 
 # --- Web ---
