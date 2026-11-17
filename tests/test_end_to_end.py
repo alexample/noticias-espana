@@ -49,7 +49,8 @@ class EndToEnd(unittest.TestCase):
         def fake_claude(prompt, system, max_tokens=1200):
             self.calls.append(prompt)
             n = prompt.count("Titular:")
-            return json.dumps({"titular": f"Noticia redactada con {n} medios",
+            return json.dumps({"novedad": "Se suman más medios." if "Versión anterior" in prompt else "",
+                               "titular": f"Noticia redactada con {n} medios",
                                "entradilla": "Entradilla.", "cuerpo": "Párrafo uno.\n\nPárrafo dos."})
         writer.call_claude = fake_claude
 
@@ -110,6 +111,7 @@ class EndToEnd(unittest.TestCase):
         detail = server.get_story(conn, top["id"])
         self.assertEqual(len(detail["articles"]), 5)
         self.assertNotIn("utm_source", detail["articles"][0]["url"])
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM story_updates").fetchone()[0], len(multi))
 
         # servidor HTTP real
         httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
@@ -123,6 +125,10 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(len(static["stories"]), len(STORIES))
         self.assertEqual(static["stories"][0]["id"], top["id"])
         self.assertEqual(len(static["stories"][0]["articles"]), 5)
+        tl = static["stories"][0]["timeline"]
+        self.assertEqual(tl[-1]["kind"], "media")
+        self.assertTrue(tl[-1]["first"])
+        self.assertIn("ai", [e["kind"] for e in tl])
         with self.assertRaises(urllib.error.HTTPError):
             urllib.request.urlopen(f"{base}/../config.py")
         st = json.loads(urllib.request.urlopen(f"{base}/api/status").read())

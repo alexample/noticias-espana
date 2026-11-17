@@ -101,6 +101,14 @@ Países incluidos: Estados Unidos, Reino Unido, Alemania, Francia, Italia, Portu
 y Argentina; se añaden más en `countries.json`. Esos titulares se muestran en la web y se
 pasan a la IA para que contraste cómo lo cuenta la prensa de ese país.
 
+### 6. Evolución de la noticia (pestaña desplegable)
+Cada noticia tiene una línea de tiempo construida casi entera sin IA: primera publicación,
+medios que se suman (agrupados por media hora, con su titular), información nueva de un
+medio que ya la cubría y llegada de la prensa extranjera. Cada vez que la IA reescribe la
+noticia, en esa misma llamada (sin coste extra) devuelve una frase con la novedad respecto
+a la versión anterior; si no hay nada sustancial, no se añade al timeline. Las versiones
+se guardan en la tabla `story_updates`.
+
 ## Configuración (variables de entorno)
 
 | variable | por defecto | |

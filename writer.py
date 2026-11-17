@@ -30,8 +30,15 @@ Redacta la noticia. Devuelve SOLO un objeto JSON válido con estas claves:
 - "etiqueta": el tema en 1-3 palabras, como lo rotularía una portada (p. ej. "DANA Valencia", "Presupuestos 2027", "Cumbre OTAN"). Sin verbos ni artículos.
 - "titular": máximo 14 palabras, informativo, sin clickbait.
 - "entradilla": 1-2 frases con lo esencial (qué, quién, cuándo, dónde).
-- "cuerpo": 2-4 párrafos breves separados por "\\n\\n". Incluye la evolución de la noticia si los artículos más recientes aportan novedades, y atribuye los datos al medio que los publica cuando sea relevante.
+- "cuerpo": 2-4 párrafos breves separados por "\\n\\n". Incluye la evolución de la noticia si los artículos más recientes aportan novedades, y atribuye los datos al medio que los publica cuando sea relevante.{novedad}
 """
+
+NOVEDAD = """
+- "novedad": una sola frase (máximo 25 palabras) con lo que ha cambiado respecto a la versión anterior: hechos, datos o reacciones nuevas. Si no hay nada sustancial, devuelve "".
+
+Versión anterior publicada ({at}):
+Titular: {headline}
+Entradilla: {lead}"""
 
 
 def _fmt_sources(articles):
@@ -113,18 +120,26 @@ def _fmt_foreign(foreign):
             "y, si aportan algo, menciona cómo lo cuenta esa prensa):\n" + "\n".join(lines))
 
 
-def write_story(articles, foreign=None):
+def write_story(articles, foreign=None, previous=None):
     """articles: lista de dicts (source, title, summary, published_at).
-    Devuelve dict(headline, lead, body)."""
+    previous: dict(headline, lead, at) de la versión anterior, si la hay; en la misma
+    llamada se pide una frase con la novedad, sin gastar otra petición.
+    Devuelve dict(headline, lead, body, tag, note)."""
     picked = _pick_articles(articles, config.AI_MAX_SOURCES_IN_PROMPT)
-    prompt = PROMPT.format(sources=_fmt_sources(picked) + _fmt_foreign(foreign))
+    novedad = ""
+    if previous and previous.get("headline"):
+        at = datetime.fromtimestamp(previous["at"] or 0, tz=timezone.utc).strftime("%d/%m %H:%M UTC")
+        novedad = NOVEDAD.format(at=at, headline=previous["headline"], lead=previous.get("lead") or "")
+    prompt = PROMPT.format(sources=_fmt_sources(picked) + _fmt_foreign(foreign), novedad=novedad)
     last_err = None
     for attempt in range(2):
         try:
             obj = _parse_json(call_claude(prompt, SYSTEM))
             tag = obj.get("etiqueta") if isinstance(obj.get("etiqueta"), str) else ""
+            note = obj.get("novedad") if isinstance(obj.get("novedad"), str) else ""
             return {"headline": obj["titular"].strip(), "lead": obj["entradilla"].strip(),
-                    "body": obj["cuerpo"].strip(), "tag": tag.strip().strip(".")[:40] or None}
+                    "body": obj["cuerpo"].strip(), "tag": tag.strip().strip(".")[:40] or None,
+                    "note": note.strip()[:300] or None}
         except Exception as e:
             last_err = e
             time.sleep(2 * (attempt + 1))

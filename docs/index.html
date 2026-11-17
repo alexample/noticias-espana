@@ -62,6 +62,27 @@
   .intl-country .flag { font-size: 20px; }
   .intl-note { font-size: 12.5px; color: var(--muted); margin: -4px 0 6px; }
   .chip.world { background: transparent; border: 1px solid var(--line); }
+  details.evo { margin: 14px 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+  details.evo > summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+                          font-size: 14px; font-weight: 700; user-select: none; }
+  details.evo > summary::-webkit-details-marker { display: none; }
+  details.evo > summary .count { font-weight: 600; font-size: 12px; color: var(--muted); }
+  details.evo > summary .chev { margin-left: auto; transition: transform .15s ease; color: var(--muted); }
+  details.evo[open] > summary .chev { transform: rotate(180deg); }
+  details.evo[open] > summary { border-bottom: 1px solid var(--line); }
+  .evo ol { list-style: none; margin: 0; padding: 14px 16px 6px 16px; }
+  .evo li { position: relative; padding: 0 0 16px 22px; }
+  .evo li::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: -6px; width: 2px; background: var(--line); }
+  .evo li:last-child::before { display: none; }
+  .evo li::after { content: ""; position: absolute; left: 0; top: 4px; width: 10px; height: 10px; border-radius: 50%;
+                   background: var(--paper); border: 2px solid var(--muted); box-sizing: border-box; }
+  .evo li.ai::after { border-color: var(--accent); background: var(--accent); }
+  .evo li.first::after { border-color: var(--ink); background: var(--ink); }
+  .evo .when { font-size: 12px; color: var(--muted); }
+  .evo .what { font-size: 14.5px; margin-top: 1px; }
+  .evo .quote { font-family: var(--serif); font-size: 15.5px; color: var(--muted); margin-top: 2px; }
+  .evo .ia { font-size: 10px; font-weight: 700; letter-spacing: .05em; color: var(--accent); border: 1px solid var(--accent);
+             border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
   .empty { text-align: center; color: var(--muted); padding: 80px 20px; }
   .detail { max-width: 760px; margin: 0 auto; }
   .back { display: inline-block; margin-bottom: 18px; color: var(--muted); text-decoration: none; font-size: 14px; cursor: pointer; }
@@ -199,7 +220,39 @@ function intlSection(s) {
           <a href="${esc(safeUrl(a.url))}" target="_blank" rel="noopener noreferrer">${esc(a.title)}</a></div></li>`).join("")}</ul>`).join("")}`;
 }
 
+// Pestaña desplegable con cómo ha ido evolucionando la noticia (la más reciente arriba).
+function evolution(s) {
+  const ev = s.timeline || [];
+  if (ev.length < 2) return "";
+  const list = names => names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} y ${names.length - 3} más`;
+  const item = e => {
+    let cls = e.kind, what = "", quote = "";
+    if (e.kind === "media") {
+      if (e.first) {
+        cls += " first";
+        const others = e.sources.filter(x => x !== e.source);
+        what = `<b>Primera publicación</b> · ${esc(e.source)}${others.length ? ` y en la primera media hora ${esc(list(others))}` : ""}`;
+      }
+      else if (e.sources.length) what = `<b>+${e.sources.length} ${e.sources.length === 1 ? "medio" : "medios"}</b>: ${esc(list(e.sources))}`;
+      else what = `<b>Nueva información</b> de ${esc(list(e.follow))}`;
+      quote = `«${esc(e.title)}»`;
+    } else if (e.kind === "ai") {
+      what = e.first ? `<b>Primera versión redactada</b> con ${e.n_sources} medios<span class="ia">IA</span>`
+                     : `<b>Actualización</b><span class="ia">IA</span>`;
+      quote = e.first ? "" : esc(e.note);
+    } else if (e.kind === "intl") {
+      what = `${e.flag} <b>La prensa de ${esc(e.name)}</b> se hace eco · ${e.count} ${e.count === 1 ? "medio" : "medios"}`;
+    }
+    return `<li class="${cls}"><div class="when">${hhmm(e.at)}</div><div class="what">${what}</div>${quote ? `<div class="quote">${quote}</div>` : ""}</li>`;
+  };
+  return `<details class="evo">
+    <summary>Evolución de la noticia <span class="count">· ${ev.length} momentos · última ${ago(ev[0].at)}</span><span class="chev">▾</span></summary>
+    <ol>${ev.map(item).join("")}</ol>
+  </details>`;
+}
+
 function renderStory(id) {
+  const wasOpen = !!document.querySelector("details.evo[open]");
   $("#bar").style.display = "none";
   if (DATA.merged[id]) { location.replace(`#/noticia/${DATA.merged[id]}`); return; }
   const s = DATA.stories.find(x => String(x.id) === String(id));
@@ -216,6 +269,7 @@ function renderStory(id) {
       <span class="badge">${s.n_sources} medios</span><span>${s.n_articles} artículos</span>
       <span>· primera publicación ${hhmm(s.first_published)}</span><span>· última ${ago(s.last_published)}</span>
     </div>
+    ${evolution(s)}
     ${img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
     <div class="body">${body}</div>
     <div class="note">${s.ai_written
@@ -230,6 +284,7 @@ function renderStory(id) {
       </div></li>`).join("")}</ul>
     ${intlSection(s)}
   </article>`;
+  if (wasOpen) { const d = document.querySelector("details.evo"); if (d) d.open = true; }
 }
 
 function render() {

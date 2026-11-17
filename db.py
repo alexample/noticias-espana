@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS intl_articles (
     UNIQUE (cluster_id, url)
 );
 CREATE INDEX IF NOT EXISTS idx_intl_cluster ON intl_articles(cluster_id);
+
+-- Cada redacción de la IA queda guardada para el timeline de la noticia
+CREATE TABLE IF NOT EXISTS story_updates (
+    id          INTEGER PRIMARY KEY,
+    cluster_id  INTEGER NOT NULL,
+    at          REAL NOT NULL,
+    headline    TEXT,
+    lead        TEXT,
+    note        TEXT,      -- qué cambia respecto a la versión anterior (IA, misma llamada)
+    n_sources   INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_updates_cluster ON story_updates(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_articles_pub ON articles(published_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_source_title ON articles(source, title_key);
 """

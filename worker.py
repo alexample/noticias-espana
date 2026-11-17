@@ -130,6 +130,7 @@ def cluster_items(conn, items, now):
         conn.execute("UPDATE articles SET cluster_id=? WHERE cluster_id=?", (dst, src))
         conn.execute("UPDATE OR IGNORE intl_articles SET cluster_id=? WHERE cluster_id=?", (dst, src))
         conn.execute("DELETE FROM intl_articles WHERE cluster_id=?", (src,))
+        conn.execute("UPDATE story_updates SET cluster_id=? WHERE cluster_id=?", (dst, src))
         conn.execute("UPDATE clusters SET status='merged', merged_into=? WHERE id=?", (dst, src))
         conn.execute("UPDATE clusters SET updated_at=? WHERE id=?", (now, dst))
     stats["merged"] = len(merges)
@@ -182,7 +183,7 @@ def write_pending(conn, now):
     if not writer.ai_enabled():
         return 0
     pending = conn.execute(
-        """SELECT id, n_sources FROM clusters
+        """SELECT id, n_sources, headline, lead, ai_written_at FROM clusters
            WHERE status='active' AND n_sources >= ?
              AND (ai_sources_count IS NULL OR n_sources > ai_sources_count)
              AND (ai_written_at IS NULL OR ai_written_at < ?)
@@ -196,11 +197,16 @@ def write_pending(conn, now):
             foreign = [dict(a) for a in conn.execute(
                 "SELECT country, source, title, published_at FROM intl_articles WHERE cluster_id=? "
                 "ORDER BY published_at DESC LIMIT 8", (row["id"],))]
-            story = writer.write_story(arts, foreign)
+            previous = {"headline": row["headline"], "lead": row["lead"], "at": row["ai_written_at"]}
+            story = writer.write_story(arts, foreign, previous if row["headline"] else None)
+            written_at = time.time()
+            conn.execute(
+                "INSERT INTO story_updates(cluster_id, at, headline, lead, note, n_sources) VALUES (?,?,?,?,?,?)",
+                (row["id"], written_at, story["headline"], story["lead"], story.get("note"), row["n_sources"]))
             conn.execute(
                 """UPDATE clusters SET headline=?, lead=?, body=?, ai_written_at=?, ai_sources_count=?,
                        ai_error=NULL, tag=COALESCE(?, tag) WHERE id=?""",
-                (story["headline"], story["lead"], story["body"], time.time(), row["n_sources"],
+                (story["headline"], story["lead"], story["body"], written_at, row["n_sources"],
                  story.get("tag"), row["id"]))
             done += 1
         except Exception as e:

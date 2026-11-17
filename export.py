@@ -18,6 +18,66 @@ def _write(path, obj):
     os.replace(tmp, path)
 
 
+WINDOW_S = 30 * 60   # artículos publicados en la misma media hora forman un único momento
+MAX_EVENTS = 30
+
+
+def build_timeline(articles, updates=(), foreign=(), countries=None):
+    """Línea de tiempo de una noticia, del momento más reciente al más antiguo.
+
+    Todo sale de los datos (sin IA) salvo la frase 'note' de las actualizaciones,
+    que la IA escribe en la misma llamada con la que redacta la noticia.
+      media  -> medios que se suman (o publican información nueva) en una media hora
+      ai     -> nueva versión redactada
+      intl   -> la prensa de otro país empieza a cubrirla
+    """
+    countries = countries or {}
+    events, seen, window = [], set(), []
+
+    def flush():
+        if not window:
+            return
+        new = []
+        for a in window:
+            if a["source"] not in seen and a["source"] not in new:
+                new.append(a["source"])
+        lead_art = next((a for a in window if a["source"] in new), window[-1])
+        events.append({
+            "at": window[0]["published_at"], "kind": "media", "first": not seen,
+            "sources": new, "follow": sorted({a["source"] for a in window} - set(new)),
+            "source": lead_art["source"], "title": lead_art["title"],
+        })
+        seen.update(new)
+        window.clear()
+
+    for a in sorted(articles, key=lambda x: x["published_at"]):
+        if window and a["published_at"] - window[0]["published_at"] > WINDOW_S:
+            flush()
+        window.append(a)
+    flush()
+
+    for i, u in enumerate(sorted(updates, key=lambda x: x["at"])):
+        if i > 0 and not u["note"]:
+            continue  # la IA no vio nada sustancial nuevo: no es un hito
+        events.append({"at": u["at"], "kind": "ai", "first": i == 0, "note": u["note"] or "",
+                       "headline": u["headline"], "n_sources": u["n_sources"]})
+
+    by_country = {}
+    for f in foreign:
+        c = by_country.setdefault(f["country"], {"at": f["fetched_at"], "count": 0})
+        c["at"] = min(c["at"], f["fetched_at"])
+        c["count"] += 1
+    for code, c in by_country.items():
+        meta = countries.get(code, {})
+        events.append({"at": c["at"], "kind": "intl", "country": code, "name": meta.get("name", code.upper()),
+                       "flag": meta.get("flag", ""), "count": c["count"]})
+
+    events.sort(key=lambda e: e["at"], reverse=True)
+    if len(events) > MAX_EVENTS:  # se conservan el origen y lo más reciente
+        events = events[:MAX_EVENTS - 3] + events[-3:]
+    return events
+
+
 def export_static(conn, out_dir=None, hours=48, limit=400):
     out_dir = out_dir or config.EXPORT_DIR
     os.makedirs(out_dir, exist_ok=True)
@@ -33,7 +93,17 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
                 f"""SELECT id, cluster_id, source, title, summary, url, image, published_at, fetched_at
                     FROM articles WHERE cluster_id IN ({q}) ORDER BY published_at DESC""", ids):
             arts.setdefault(a["cluster_id"], []).append(a)
-    foreign = {}
+    foreign, updates = {}, {}
+    if ids:
+        for u in conn.execute(f"SELECT * FROM story_updates WHERE cluster_id IN ({q}) ORDER BY at", ids):
+            updates.setdefault(u["cluster_id"], []).append(u)
+        foreign_rows = conn.execute(
+            f"SELECT cluster_id, country, fetched_at FROM intl_articles WHERE cluster_id IN ({q})", ids).fetchall()
+    else:
+        foreign_rows = []
+    foreign_by_cluster = {}
+    for f in foreign_rows:
+        foreign_by_cluster.setdefault(f["cluster_id"], []).append(f)
     if ids:
         for f in conn.execute(
                 f"""SELECT cluster_id, country, source, title, url, published_at FROM intl_articles
@@ -71,6 +141,7 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
             "first_published": c["first_published"],
             "last_published": c["last_published"],
             "sources": sources,
+            "timeline": build_timeline(items, updates.get(c["id"], []), foreign_by_cluster.get(c["id"], []), countries),
             "intl": [{
                 "country": code, "name": countries.get(code, {}).get("name", code.upper()),
                 "flag": countries.get(code, {}).get("flag", ""),
@@ -103,6 +174,8 @@ def prune(conn, days=7):
                  "(SELECT id FROM clusters WHERE status != 'active')", (cutoff,))
     conn.execute("DELETE FROM intl_articles WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "
                  "AND fetched_at < ?", (cutoff,))
+    conn.execute("DELETE FROM story_updates WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "
+                 "AND at < ?", (cutoff,))
     conn.execute("""DELETE FROM clusters WHERE status != 'active' AND updated_at < ?
                     AND id NOT IN (SELECT DISTINCT cluster_id FROM articles WHERE cluster_id IS NOT NULL)""",
                  (cutoff,))
