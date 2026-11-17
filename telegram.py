@@ -66,7 +66,7 @@ def _media_line(sources):
 
 
 def format_new(story, sources, flags):
-    lines = [f"🔴 <b>{_e(story['headline'])}</b>", ""]
+    lines = [f"{_e(config.TELEGRAM_HEADER)}  ·  <i>Última hora</i>", "", f"🔴 <b>{_e(story['headline'])}</b>", ""]
     if story["lead"]:
         lines += [_e(story["lead"]), ""]
     lines.append(_media_line(sources))
@@ -77,7 +77,8 @@ def format_new(story, sources, flags):
 
 
 def format_update(story, note, n_sources):
-    return "\n".join([f"🔄 <b>Actualización</b> · {n_sources} medios", "", _e(note), "", _link(story["id"])])
+    return "\n".join([f"{_e(config.TELEGRAM_HEADER)}  ·  <i>Actualización</i>", "",
+                      f"🔄 <b>{_e(note)}</b>", "", f"📰 Ya son {n_sources} medios", "", _link(story["id"])])
 
 
 def _sources(conn, cid):
