@@ -192,6 +192,15 @@ def process(conn, now, sender=None, countries=None, written_before=None):
             log.info("Telegram: publicada noticia %s%s", c["id"], " (última hora)" if is_breaking else "")
             time.sleep(1)
 
+        pending = conn.execute(
+            """SELECT COUNT(*) FROM clusters c LEFT JOIN telegram_posts t ON t.cluster_id = c.id
+               WHERE c.status='active' AND c.breaking_at >= ? AND t.cluster_id IS NULL""",
+            (now - breaking.BREAKING_TTL_S,)).fetchone()[0]
+        already = conn.execute(
+            """SELECT COUNT(*) FROM clusters c JOIN telegram_posts t ON t.cluster_id = c.id
+               WHERE c.status='active' AND c.breaking_at >= ?""", (now - breaking.BREAKING_TTL_S,)).fetchone()[0]
+        log.info("Telegram: últimas horas activas · %d ya en el canal (o vistas), %d sin publicar", already, pending)
+
         # 1b) últimas horas publicadas con el titular original que ya están confirmadas y redactadas
         for r in conn.execute(
                 """SELECT c.*, t.message_id FROM telegram_posts t JOIN clusters c ON c.id = t.cluster_id
