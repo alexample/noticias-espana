@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 20
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -64,12 +64,45 @@ jobs:
         with:
           path: docs
 
+      # A veces GitHub Pages falla de forma pasajera ("Fetching artifact metadata failed").
+      # Se reintenta dos veces antes de darlo por perdido; si aun así falla, la pasada
+      # siguiente vuelve a publicar todo, así que no se marca la ejecución como fallida.
       - id: deploy
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Esperar antes de reintentar
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 30
+
+      - id: deploy2
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Esperar antes del último intento
+        if: steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 60
+
+      - id: deploy3
+        if: steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - id: published
+        name: Comprobar publicación
+        run: |
+          if [ "${{ steps.deploy.outcome }}" = success ] || [ "${{ steps.deploy2.outcome }}" = success ] || [ "${{ steps.deploy3.outcome }}" = success ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub Pages no respondió tras 3 intentos; la web se actualizará en la próxima pasada."
+          fi
 
       # Telegram se publica justo después de desplegar: así la página de cada noticia
       # (con su miniatura) ya está en la web cuando Telegram la consulta, sin retraso.
       - name: Publicar en Telegram
+        if: steps.published.outputs.ok == 'true'   # solo si la web (y las miniaturas) están en línea
         env:
           # Canal de Telegram (opcional): sin estos secretos no se publica nada
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
