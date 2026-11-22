@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <SwitchPreferenceCompat
+        app:key="enabled"
+        app:defaultValue="true"
+        app:title="Avisos activados"
+        app:summary="Desactívalo para no recibir ningún aviso" />
+
+    <PreferenceCategory app:title="Qué noticias te avisamos" app:dependency="enabled">
+        <SwitchPreferenceCompat
+            app:key="breaking"
+            app:defaultValue="true"
+            app:title="🔴 Última hora"
+            app:summary="En cuanto un medio la publica (✓), aunque aún no esté confirmada" />
+        <SwitchPreferenceCompat
+            app:key="confirmed"
+            app:defaultValue="true"
+            app:title="✓✓ Noticias confirmadas"
+            app:summary="Cuando varios medios publican la misma noticia" />
+        <ListPreference
+            app:key="min_sources"
+            app:defaultValue="4"
+            app:dependency="confirmed"
+            app:entries="@array/min_sources_entries"
+            app:entryValues="@array/min_sources_values"
+            app:title="A partir de cuántos medios"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:key="topics"
+            app:defaultValue="true"
+            app:title="🏷 Mis temas"
+            app:summary="Cualquier noticia (de 2 medios o más) que mencione tus temas" />
+        <EditTextPreference
+            app:key="keywords"
+            app:defaultValue=""
+            app:dependency="topics"
+            app:title="Temas que te interesan"
+            app:dialogMessage="Palabras separadas por comas. Ejemplo: Valencia, vivienda, Real Madrid, aranceles" />
+        <EditTextPreference
+            app:key="mute"
+            app:defaultValue=""
+            app:title="🔇 Silenciar temas"
+            app:dialogMessage="Nunca te avisaremos de noticias con estas palabras, separadas por comas. Ejemplo: fútbol, Gran Hermano" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Seguimiento de noticias" app:dependency="enabled">
+        <SwitchPreferenceCompat
+            app:key="follow_notes"
+            app:defaultValue="true"
+            app:title="🔄 Novedades"
+            app:summary="Cada vez que la noticia cambia: nuevos datos, reacciones, hechos" />
+        <SwitchPreferenceCompat
+            app:key="follow_confirm"
+            app:defaultValue="true"
+            app:title="✓✓ Confirmación"
+            app:summary="Cuando una última hora de un solo medio queda confirmada por otros" />
+        <SwitchPreferenceCompat
+            app:key="follow_sources"
+            app:defaultValue="false"
+            app:title="📰 Nuevos medios"
+            app:summary="Cuando más medios se suman a la noticia" />
+        <ListPreference
+            app:key="follow_step"
+            app:defaultValue="3"
+            app:dependency="follow_sources"
+            app:entries="@array/step_entries"
+            app:entryValues="@array/step_values"
+            app:title="Avisar"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:key="follow_intl"
+            app:defaultValue="true"
+            app:title="🌍 Prensa internacional"
+            app:summary="Cuando la prensa de otro país se hace eco" />
+        <SwitchPreferenceCompat
+            app:key="autofollow_breaking"
+            app:defaultValue="false"
+            app:title="Seguir automáticamente las de última hora" />
+        <SwitchPreferenceCompat
+            app:key="autofollow_topics"
+            app:defaultValue="false"
+            app:title="Seguir automáticamente las de mis temas" />
+        <ListPreference
+            app:key="follow_days"
+            app:defaultValue="3"
+            app:entries="@array/follow_days_entries"
+            app:entryValues="@array/follow_days_values"
+            app:title="Dejar de seguir tras … sin novedades"
+            app:useSimpleSummaryProvider="true" />
+        <Preference
+            app:key="open_following"
+            app:title="Ver noticias que sigues" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Ritmo" app:dependency="enabled">
+        <ListPreference
+            app:key="interval"
+            app:defaultValue="15"
+            app:entries="@array/interval_entries"
+            app:entryValues="@array/interval_values"
+            app:title="Comprobar novedades"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:key="max_per_hour"
+            app:defaultValue="4"
+            app:entries="@array/max_per_hour_entries"
+            app:entryValues="@array/max_per_hour_values"
+            app:title="Máximo de avisos de noticias nuevas"
+            app:summary="Las noticias que sigues no cuentan para este límite"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="No molestar" app:dependency="enabled">
+        <SwitchPreferenceCompat
+            app:key="quiet"
+            app:defaultValue="false"
+            app:title="🌙 Horas de silencio" />
+        <ListPreference
+            app:key="quiet_from"
+            app:defaultValue="23"
+            app:dependency="quiet"
+            app:entries="@array/hour_entries"
+            app:entryValues="@array/hour_values"
+            app:title="Desde"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:key="quiet_to"
+            app:defaultValue="8"
+            app:dependency="quiet"
+            app:entries="@array/hour_entries"
+            app:entryValues="@array/hour_values"
+            app:title="Hasta"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:key="quiet_breaking"
+            app:defaultValue="true"
+            app:dependency="quiet"
+            app:title="Dejar pasar la última hora"
+            app:summary="Las noticias de última hora te llegan aunque sea hora de silencio" />
+        <SwitchPreferenceCompat
+            app:key="quiet_follow"
+            app:defaultValue="false"
+            app:dependency="quiet"
+            app:title="Dejar pasar las noticias que sigo" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Sonido y vibración">
+        <Preference
+            app:key="system_channels"
+            app:title="Sonido, vibración y estilo por tipo de aviso"
+            app:summary="Última hora, confirmadas, mis temas y seguimiento tienen ajustes propios en Android" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Comprobar">
+        <Preference
+            app:key="check_now"
+            app:title="Buscar novedades ahora" />
+        <Preference
+            app:key="test"
+            app:title="Enviar un aviso de prueba" />
+    </PreferenceCategory>
+</PreferenceScreen>

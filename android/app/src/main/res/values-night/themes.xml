@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.DobleCheck" parent="Theme.Material3.DayNight">
+        <item name="colorPrimary">#53BDEB</item>
+        <item name="colorSecondary">#FF6B5E</item>
+        <item name="android:statusBarColor">#141312</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorSurface">#1C1B19</item>
+        <item name="android:colorBackground">#141312</item>
+    </style>
+</resources>

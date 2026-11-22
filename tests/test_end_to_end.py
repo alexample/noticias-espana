@@ -121,6 +121,10 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(len(api), len(STORIES))
         html = urllib.request.urlopen(f"{base}/noticia/{top['id']}").read().decode()
         self.assertIn("Al", html)
+        feed = json.loads(urllib.request.urlopen(f"{base}/data/feed.json").read())
+        self.assertEqual(feed["v"], 1)
+        self.assertEqual(len(feed["s"]), len(multi))  # solo las que pueden generar avisos
+        self.assertEqual(set(feed["s"][0]), {"id", "h", "t", "n", "b", "ai", "fp", "lp", "src", "u", "i"})
         static = json.loads(urllib.request.urlopen(f"{base}/data/stories.json").read())
         self.assertEqual(len(static["stories"]), len(STORIES))
         self.assertEqual(static["stories"][0]["id"], top["id"])

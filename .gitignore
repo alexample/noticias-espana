@@ -3,3 +3,8 @@ __pycache__/
 *.db*
 docs/data/
 docs/n/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.jks

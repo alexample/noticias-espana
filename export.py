@@ -141,6 +141,32 @@ def _write_text(path, text):
     os.replace(tmp, path)
 
 
+def app_feed(stories, merged, now):
+    """Versión mínima de stories.json para la app de Android, que la consulta cada pocos
+    minutos: solo lo necesario para decidir avisos y seguir noticias (unos pocos KB)."""
+    out = []
+    for s in stories:
+        # solo lo que puede generar un aviso: varios medios o última hora, de las últimas 24 h
+        if not (s["n_sources"] >= 2 or s.get("breaking")) or now - (s["last_published"] or 0) > 24 * 3600:
+            continue
+        notes = [e for e in s.get("timeline", []) if e["kind"] == "ai" and not e.get("first") and e.get("note")]
+        last = max(notes, key=lambda e: e["at"]) if notes else None
+        out.append({
+            "id": s["id"],
+            "h": s["headline"],
+            "t": s.get("tag") or "",
+            "n": s["n_sources"],
+            "b": 1 if s.get("breaking") else 0,
+            "ai": 1 if s.get("ai_written") else 0,
+            "fp": int(s["first_published"] or 0),
+            "lp": int(s["last_published"] or 0),
+            "src": s["sources"][:5],
+            "u": {"at": int(last["at"]), "note": last["note"]} if last else None,
+            "i": [c["flag"] for c in s.get("intl", [])],
+        })
+    return {"v": 1, "g": int(now), "s": out, "m": {k: v for k, v in merged.items()}}
+
+
 def export_static(conn, out_dir=None, hours=48, limit=400):
     out_dir = out_dir or config.EXPORT_DIR
     os.makedirs(out_dir, exist_ok=True)
@@ -222,6 +248,7 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
     merged = {str(r["id"]): r["merged_into"] for r in conn.execute(
         "SELECT id, merged_into FROM clusters WHERE status='merged' AND updated_at >= ?", (now - hours * 3600,))}
     _write(os.path.join(out_dir, "stories.json"), {"generated_at": now, "stories": stories, "merged": merged})
+    _write(os.path.join(out_dir, "feed.json"), app_feed(stories, merged, now))
     write_share_pages(conn, os.path.join(os.path.dirname(os.path.abspath(out_dir)), "n"), config.SITE_URL)
 
     srcs = [dict(r) for r in conn.execute(

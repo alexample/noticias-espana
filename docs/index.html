@@ -96,6 +96,11 @@
   .badge.single { background: transparent; color: var(--muted); border: 1px solid var(--line); }
   .bk { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
         text-transform: uppercase; color: var(--accent); }
+  .follow { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 6px; padding: 9px 16px; border-radius: 999px;
+            border: 1px solid var(--check); background: transparent; color: var(--check); font-size: 15px; font-weight: 700;
+            cursor: pointer; font-family: var(--sans); }
+  .follow.on { background: var(--check); color: #fff; }
+  .app-link { font-size: 13px; color: var(--check); text-decoration: none; font-weight: 600; white-space: nowrap; }
   .empty { text-align: center; color: var(--muted); padding: 80px 20px; }
   .detail { max-width: 760px; margin: 0 auto; }
   .detail .bk { display: flex; margin: 0 0 8px 4px; }
@@ -125,7 +130,8 @@
   <div class="wrap">
     <div class="masthead">
       <a class="logo" href="#/" aria-label="DobleCheck">Doble<b>Check</b><svg class="ticks" viewBox="0 0 18 12" aria-hidden="true"><path d="M1.5 6.5l3.2 3.2L11 2.5M7.6 9.2l.5.5L16.5 1.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-      <div class="meta" id="meta">Cargando…</div>
+      <div class="meta"><span id="meta">Cargando…</span>
+        <a class="app-link" id="applink" href="https://github.com/alexample/noticias-espana/releases/latest/download/DobleCheck.apk"> · 📱 App Android</a></div>
     </div>
     <div class="bar" id="bar">
       <input type="search" id="q" placeholder="Buscar en las noticias…" autocomplete="off">
@@ -275,6 +281,22 @@ function evolution(s) {
   </details>`;
 }
 
+// Dentro de la app de Android: botón para seguir la noticia y recibir sus novedades.
+const APP = /DobleCheckApp/.test(navigator.userAgent) && window.DobleCheckApp;
+function followButton(s) {
+  if (!APP) return "";
+  const on = window.DobleCheckApp.isFollowing(s.id);
+  return `<button class="follow ${on ? "on" : ""}" data-id="${s.id}" data-h="${esc(s.headline)}">${on ? "🔔 Siguiendo · te avisaremos de cada novedad" : "🔔 Seguir esta noticia"}</button>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button.follow");
+  if (!b || !APP) return;
+  const on = window.DobleCheckApp.toggleFollow(+b.dataset.id, b.dataset.h);
+  b.classList.toggle("on", on);
+  b.textContent = on ? "🔔 Siguiendo · te avisaremos de cada novedad" : "🔔 Seguir esta noticia";
+});
+if (APP) { const l = document.getElementById("applink"); if (l) l.remove(); }
+
 function renderStory(id) {
   const wasOpen = !!document.querySelector("details.evo[open]");
   $("#bar").style.display = "none";
@@ -294,6 +316,7 @@ function renderStory(id) {
       ${badge(s.n_sources)}<span>${s.n_articles} ${s.n_articles === 1 ? "artículo" : "artículos"}</span>
       <span>· primera publicación ${hhmm(s.first_published)}</span><span>· última ${ago(s.last_published)}</span>
     </div>
+    ${followButton(s)}
     ${evolution(s)}
     ${img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
     <div class="body">${body}</div>

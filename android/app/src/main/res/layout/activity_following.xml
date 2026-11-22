@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="24dp"
+        android:textSize="16sp"
+        android:text="Aún no sigues ninguna noticia.\n\nPulsa «🔔 Seguir» en una noticia, o en el botón «Seguir» de un aviso, y te avisaremos de cada novedad: actualizaciones, nuevos medios que la confirman y la prensa extranjera que se hace eco." />
+
+    <ListView
+        android:id="@+id/list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+</LinearLayout>

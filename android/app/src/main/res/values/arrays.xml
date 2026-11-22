@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="min_sources_entries">
+        <item>2 medios (muchos avisos)</item><item>3 medios</item><item>4 medios</item>
+        <item>6 medios</item><item>8 medios</item><item>10 medios (solo lo más gordo)</item>
+    </string-array>
+    <string-array name="min_sources_values">
+        <item>2</item><item>3</item><item>4</item><item>6</item><item>8</item><item>10</item>
+    </string-array>
+
+    <string-array name="interval_entries">
+        <item>Cada 15 minutos</item><item>Cada 30 minutos</item><item>Cada hora</item>
+    </string-array>
+    <string-array name="interval_values">
+        <item>15</item><item>30</item><item>60</item>
+    </string-array>
+
+    <string-array name="max_per_hour_entries">
+        <item>2 por hora</item><item>4 por hora</item><item>8 por hora</item><item>Sin límite</item>
+    </string-array>
+    <string-array name="max_per_hour_values">
+        <item>2</item><item>4</item><item>8</item><item>0</item>
+    </string-array>
+
+    <string-array name="step_entries">
+        <item>Cada medio nuevo</item><item>Cada 2 medios</item><item>Cada 3 medios</item><item>Cada 5 medios</item>
+    </string-array>
+    <string-array name="step_values">
+        <item>1</item><item>2</item><item>3</item><item>5</item>
+    </string-array>
+
+    <string-array name="follow_days_entries">
+        <item>1 día</item><item>3 días</item><item>1 semana</item>
+    </string-array>
+    <string-array name="follow_days_values">
+        <item>1</item><item>3</item><item>7</item>
+    </string-array>
+
+    <string-array name="hour_entries">
+        <item>00:00</item><item>01:00</item><item>02:00</item><item>03:00</item><item>04:00</item><item>05:00</item>
+        <item>06:00</item><item>07:00</item><item>08:00</item><item>09:00</item><item>10:00</item><item>11:00</item>
+        <item>12:00</item><item>13:00</item><item>14:00</item><item>15:00</item><item>16:00</item><item>17:00</item>
+        <item>18:00</item><item>19:00</item><item>20:00</item><item>21:00</item><item>22:00</item><item>23:00</item>
+    </string-array>
+    <string-array name="hour_values">
+        <item>0</item><item>1</item><item>2</item><item>3</item><item>4</item><item>5</item>
+        <item>6</item><item>7</item><item>8</item><item>9</item><item>10</item><item>11</item>
+        <item>12</item><item>13</item><item>14</item><item>15</item><item>16</item><item>17</item>
+        <item>18</item><item>19</item><item>20</item><item>21</item><item>22</item><item>23</item>
+    </string-array>
+</resources>

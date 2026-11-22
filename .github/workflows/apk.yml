@@ -1,0 +1,78 @@
+name: App Android
+
+# Compila la app de DobleCheck y la publica como DobleCheck.apk en «Releases».
+# Enlace fijo a la última versión:
+#   https://github.com/<usuario>/<repo>/releases/latest/download/DobleCheck.apk
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # para crear la «release» con la APK
+
+concurrency:
+  group: apk
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      # La clave de firma está cifrada en android/keystore.enc; su contraseña es el
+      # secreto ANDROID_KEYSTORE_PASSWORD. Sin él se firma con una clave de prueba
+      # (funciona, pero cada versión tendría otra firma y habría que desinstalar para actualizar).
+      - name: Preparar firma
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_PASSWORD" ]; then
+            printf '%s' "$KEYSTORE_PASSWORD" > "$RUNNER_TEMP/pw"
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in android/keystore.enc \
+              -out "$RUNNER_TEMP/release.jks" -pass file:"$RUNNER_TEMP/pw"
+            rm "$RUNNER_TEMP/pw"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "Firma de publicación preparada"
+          else
+            echo "::warning::Falta el secreto ANDROID_KEYSTORE_PASSWORD: se firma con una clave de prueba."
+          fi
+
+      - name: Compilar APK
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Preparar archivo
+        run: cp android/app/build/outputs/apk/release/app-release.apk DobleCheck.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DobleCheck-1.0.${{ github.run_number }}
+          path: DobleCheck.apk
+
+      - name: Publicar versión
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "app-v1.0.${{ github.run_number }}" DobleCheck.apk \
+            --title "DobleCheck para Android 1.0.${{ github.run_number }}" \
+            --notes "Descarga **DobleCheck.apk** e instálala en tu Android (puede pedirte permitir instalar apps de esta fuente). Las nuevas versiones se instalan encima sin perder tus ajustes ni las noticias que sigues." \
+            --latest
