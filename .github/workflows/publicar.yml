@@ -54,6 +54,8 @@ jobs:
         env:
           # Secreto opcional: sin él la web muestra el titular original de cada medio.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Comentarios de YouTube para «Qué dicen los lectores» (opcional)
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
           export NEWS_SITE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
           python worker.py --once --no-telegram

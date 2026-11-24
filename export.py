@@ -182,8 +182,17 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
                 f"""SELECT id, cluster_id, source, title, summary, url, image, published_at, fetched_at
                     FROM articles WHERE cluster_id IN ({q}) ORDER BY published_at DESC""", ids):
             arts.setdefault(a["cluster_id"], []).append(a)
-    foreign, updates = {}, {}
+    foreign, updates, readers = {}, {}, {}
     if ids:
+        vids = {}
+        for v in conn.execute(f"""SELECT cluster_id, video_id, channel, title FROM yt_videos
+                                  WHERE cluster_id IN ({q}) AND disabled=0 ORDER BY comment_count DESC""", ids):
+            vids.setdefault(v["cluster_id"], []).append(
+                {"channel": v["channel"], "title": v["title"], "url": f"https://www.youtube.com/watch?v={v['video_id']}"})
+        for c in clusters:
+            if c["readers_summary"]:
+                readers[c["id"]] = {"summary": c["readers_summary"], "count": c["readers_count"],
+                                    "at": c["readers_at"], "videos": vids.get(c["id"], [])[:2]}
         for u in conn.execute(f"SELECT * FROM story_updates WHERE cluster_id IN ({q}) ORDER BY at", ids):
             updates.setdefault(u["cluster_id"], []).append(u)
         foreign_rows = conn.execute(
@@ -231,6 +240,7 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
             "first_published": c["first_published"],
             "last_published": c["last_published"],
             "sources": sources,
+            "readers": readers.get(c["id"]),
             "timeline": build_timeline(items, updates.get(c["id"], []), foreign_by_cluster.get(c["id"], []), countries),
             "intl": [{
                 "country": code, "name": countries.get(code, {}).get("name", code.upper()),
@@ -266,6 +276,8 @@ def prune(conn, days=7):
                  "(SELECT id FROM clusters WHERE status != 'active')", (cutoff,))
     conn.execute("DELETE FROM intl_articles WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "
                  "AND fetched_at < ?", (cutoff,))
+    for t in ("yt_comments", "yt_videos"):
+        conn.execute(f"DELETE FROM {t} WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active')")
     conn.execute("DELETE FROM story_updates WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "
                  "AND at < ?", (cutoff,))
     conn.execute("DELETE FROM telegram_posts WHERE cluster_id NOT IN (SELECT id FROM clusters WHERE status='active') "

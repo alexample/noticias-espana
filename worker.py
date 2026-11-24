@@ -20,6 +20,7 @@ import feeds
 import intl
 import telegram
 import writer
+import youtube
 from clustering import Cluster, Corpus, Matcher, vectorize
 from textproc import article_features, fold
 
@@ -133,6 +134,8 @@ def cluster_items(conn, items, now):
         conn.execute("UPDATE OR IGNORE intl_articles SET cluster_id=? WHERE cluster_id=?", (dst, src))
         conn.execute("DELETE FROM intl_articles WHERE cluster_id=?", (src,))
         conn.execute("UPDATE story_updates SET cluster_id=? WHERE cluster_id=?", (dst, src))
+        conn.execute("UPDATE yt_videos SET cluster_id=? WHERE cluster_id=?", (dst, src))
+        conn.execute("UPDATE yt_comments SET cluster_id=? WHERE cluster_id=?", (dst, src))
         conn.execute("UPDATE OR IGNORE telegram_posts SET cluster_id=? WHERE cluster_id=?", (dst, src))
         conn.execute("DELETE FROM telegram_posts WHERE cluster_id=?", (src,))
         conn.execute("UPDATE clusters SET status='merged', merged_into=? WHERE id=?", (dst, src))
@@ -260,7 +263,13 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None, telegram_inline=True):
     except Exception:
         log.exception("Cobertura internacional falló")
         stats["intl"] = 0
+    try:
+        stats["youtube"] = youtube.process(conn, now)
+    except Exception:
+        log.exception("YouTube falló")
+        stats["youtube"] = {}
     stats["ai_written"] = write_pending(conn, now)
+    stats["readers"] = youtube.summarize_pending(conn, now)
     export.prune(conn, config.PRUNE_DAYS)
     stats["exported"] = export.export_static(conn)
     if telegram_inline:
@@ -271,8 +280,8 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None, telegram_inline=True):
     stats["feeds"] = len(results)
     stats["seconds"] = round(time.time() - t0, 1)
     log.info("Ciclo: %d artículos nuevos -> %d noticias nuevas, %d añadidos a existentes, %d fusiones, "
-             "%d redactadas, %d de última hora, %d artículos internacionales, %d mensajes a Telegram · feeds %d/%d · %.1fs", len(items), stats["new"],
-             stats["joined"], stats["merged"], stats["ai_written"], stats["breaking"], stats["intl"], stats["telegram"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
+             "%d redactadas, %d de última hora, %d artículos internacionales, %d resúmenes de lectores, %d mensajes a Telegram · feeds %d/%d · %.1fs", len(items), stats["new"],
+             stats["joined"], stats["merged"], stats["ai_written"], stats["breaking"], stats["intl"], stats["readers"], stats["telegram"], stats["feeds_ok"], stats["feeds"], stats["seconds"])
     return stats
 
 

@@ -148,3 +148,31 @@ def write_story(articles, foreign=None, previous=None):
 
 def ai_enabled():
     return bool(config.ANTHROPIC_API_KEY)
+
+
+READERS_SYSTEM = (
+    "Resumes de forma neutral lo que opinan los lectores en los comentarios de una noticia. "
+    "Describes las corrientes de opinión y su peso aproximado (la mayoría, una parte, algunos), "
+    "nunca como hechos ni como la postura de DobleCheck. No citas comentarios literalmente, no nombras "
+    "a nadie, no reproduces insultos ni expresiones de odio, e ignoras el spam y los comentarios "
+    "que no hablan de la noticia. Escribes en español de España."
+)
+
+READERS_PROMPT = """Noticia: {headline}
+
+Comentarios de lectores en YouTube (ordenados de más a menos valorados; puede haber ruido):
+{comments}
+
+Resume en 2-3 frases (máximo 70 palabras) qué opinan los lectores. Si las opiniones están muy divididas, dilo. Devuelve SOLO un JSON: {{"resumen": "..."}}"""
+
+
+def summarize_readers(headline, comments):
+    """Resumen de lo que opinan los lectores (comentarios de YouTube). Devuelve el texto."""
+    lines = "\n".join(f"- {c.strip()[:300]}" for c in comments if c.strip())
+    text = call_claude(READERS_PROMPT.format(headline=headline, comments=lines), READERS_SYSTEM, max_tokens=400)
+    start, end = text.find("{"), text.rfind("}")
+    obj = json.loads(text[start:end + 1], strict=False)
+    summary = (obj.get("resumen") or "").strip()
+    if not summary:
+        raise ValueError("Resumen vacío")
+    return summary[:600]

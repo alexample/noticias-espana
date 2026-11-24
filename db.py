@@ -84,6 +84,32 @@ CREATE TABLE IF NOT EXISTS story_updates (
 );
 CREATE INDEX IF NOT EXISTS idx_updates_cluster ON story_updates(cluster_id);
 
+-- Vídeos de YouTube de los medios sobre cada noticia y sus comentarios (solo el texto,
+-- sin autor: solo se usan para resumir lo que opinan los lectores)
+CREATE TABLE IF NOT EXISTS yt_videos (
+    video_id        TEXT PRIMARY KEY,
+    cluster_id      INTEGER NOT NULL,
+    channel         TEXT,
+    title           TEXT,
+    published_at    REAL,
+    found_at        REAL NOT NULL,
+    checked_at      REAL,
+    comment_count   INTEGER,
+    disabled        INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ytv_cluster ON yt_videos(cluster_id);
+CREATE TABLE IF NOT EXISTS yt_comments (
+    comment_id   TEXT PRIMARY KEY,
+    video_id     TEXT NOT NULL,
+    cluster_id   INTEGER NOT NULL,
+    text         TEXT NOT NULL,
+    likes        INTEGER NOT NULL DEFAULT 0,
+    published_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_ytc_cluster ON yt_comments(cluster_id);
+-- Contadores (cupo diario de búsquedas de YouTube)
+CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
+
 -- Mensajes publicados en el canal de Telegram (para responder con actualizaciones)
 CREATE TABLE IF NOT EXISTS telegram_posts (
     cluster_id      INTEGER PRIMARY KEY,
@@ -111,7 +137,8 @@ def init(conn):
     # columnas añadidas después de la primera versión
     cols = {r[1] for r in conn.execute("PRAGMA table_info(clusters)")}
     for name, kind in (("tag", "TEXT"), ("intl_countries", "TEXT"), ("intl_checked_at", "REAL"),
-                       ("breaking_at", "REAL")):
+                       ("breaking_at", "REAL"), ("yt_checked_at", "REAL"), ("readers_summary", "TEXT"),
+                       ("readers_count", "INTEGER"), ("readers_at", "REAL")):
         if name not in cols:
             conn.execute(f"ALTER TABLE clusters ADD COLUMN {name} {kind}")
     tcols = {r[1] for r in conn.execute("PRAGMA table_info(telegram_posts)")}

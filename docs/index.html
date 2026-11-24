@@ -101,6 +101,11 @@
             cursor: pointer; font-family: var(--sans); }
   .follow.on { background: var(--check); color: #fff; }
   .app-link { font-size: 13px; color: var(--check); text-decoration: none; font-weight: 600; white-space: nowrap; }
+  .readers { margin: 22px 0 8px; padding: 16px 18px; border-radius: 12px; background: var(--chip); }
+  .readers h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .readers p { margin: 0 0 10px; font-family: var(--serif); font-size: 17.5px; line-height: 1.5; }
+  .readers .rm { font-size: 12.5px; color: var(--muted); }
+  .readers .rm a { color: var(--check); text-decoration: none; }
   .empty { text-align: center; color: var(--muted); padding: 80px 20px; }
   .detail { max-width: 760px; margin: 0 auto; }
   .detail .bk { display: flex; margin: 0 0 8px 4px; }
@@ -297,6 +302,18 @@ document.addEventListener("click", e => {
 });
 if (APP) { const l = document.getElementById("applink"); if (l) l.remove(); }
 
+// «Qué dicen los lectores»: resumen (IA) de los comentarios en YouTube del vídeo de la noticia.
+function readersSection(s) {
+  const r = s.readers;
+  if (!r || !r.summary) return "";
+  const vids = (r.videos || []).map(v => `<a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer">vídeo de ${esc(v.channel)}</a>`).join(" y ");
+  return `<section class="readers">
+    <h4>💬 Qué dicen los lectores</h4>
+    <p>${esc(r.summary)}</p>
+    <div class="rm">Resumen automático (IA) de ${r.count} comentarios en YouTube${vids ? ` · ${vids}` : ""} · ${ago(r.at)}. No refleja la opinión de DobleCheck.</div>
+  </section>`;
+}
+
 function renderStory(id) {
   const wasOpen = !!document.querySelector("details.evo[open]");
   $("#bar").style.display = "none";
@@ -320,6 +337,7 @@ function renderStory(id) {
     ${evolution(s)}
     ${img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
     <div class="body">${body}</div>
+    ${readersSection(s)}
     <div class="note">${s.ai_written
       ? `Texto redactado automáticamente con IA a partir de ${s.ai_sources_count} medios · ${ago(s.ai_written_at)}.${pending ? ` Hay ${pending} artículo(s) nuevo(s) desde entonces; el texto se actualizará en breve.` : ""}`
       : s.n_sources === 1

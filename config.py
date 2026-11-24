@@ -49,6 +49,16 @@ INTL_MAX_PER_CYCLE = _env("NEWS_INTL_MAX_PER_CYCLE", 4, int)  # limita peticione
 INTL_RECHECK_MIN = _env("NEWS_INTL_RECHECK_MIN", 60, int)     # cada cuánto se vuelve a buscar
 INTL_MAX_PER_COUNTRY = 6
 
+# --- Comentarios de YouTube ("Qué dicen los lectores") ---
+YOUTUBE_API_KEY = _env("YOUTUBE_API_KEY", "")
+YT_MIN_SOURCES = _env("YT_MIN_SOURCES", 4, int)           # solo noticias con cierta relevancia
+YT_SEARCHES_PER_DAY = _env("YT_SEARCHES_PER_DAY", 90, int)  # la API permite 100 búsquedas al día
+YT_SEARCHES_PER_CYCLE = _env("YT_SEARCHES_PER_CYCLE", 2, int)
+YT_RECHECK_MIN = _env("YT_RECHECK_MIN", 60, int)            # cada cuánto se releen los comentarios
+YT_MIN_COMMENTS = _env("YT_MIN_COMMENTS", 15, int)          # mínimo para resumir
+READERS_MAX_PER_CYCLE = _env("READERS_MAX_PER_CYCLE", 4, int)
+READERS_EVERY_MIN = _env("READERS_EVERY_MIN", 120, int)     # no rehacer el resumen más a menudo
+
 # --- Canal de Telegram ---
 TELEGRAM_BOT_TOKEN = _env("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = _env("TELEGRAM_CHAT_ID", "")              # "@nombre_del_canal" o id numérico
