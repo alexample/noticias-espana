@@ -1,19 +1,17 @@
 """Comentarios de YouTube para la sección «Qué dicen los lectores».
 
 Sin IA salvo el resumen final:
-  1. Para las noticias relevantes se busca el vídeo en YouTube (API oficial de Google)
-     y solo se aceptan vídeos de canales de medios españoles cuyo título encaje con la
-     noticia.
-  Solo noticias nuevas (menos de 12 h). Los comentarios se leen cuando el vídeo lleva 1 h
-  publicado y se releen cada 3 h durante 24 h; el resumen se rehace como mucho cada 6 h
-  y solo si han llegado 20 comentarios nuevos o más.
-  2. Se leen sus comentarios más valorados. Se guarda solo el texto y los «me gusta»:
-     ni autores ni perfiles.
-  3. Cuando hay suficientes comentarios, la IA escribe 2-3 frases neutrales con las
-     opiniones principales (writer.summarize_readers).
+  1. Se vigilan los canales de YouTube de los medios españoles: cada 30 minutos se leen
+     sus últimos vídeos (la búsqueda general de YouTube no encuentra bien estos vídeos).
+  2. Cada vídeo se asigna a su noticia con el mismo algoritmo que agrupa los artículos
+     (título y descripción del vídeo frente a las noticias activas).
+  3. Solo noticias nuevas y relevantes. Los comentarios más valorados se leen cuando el
+     vídeo lleva 1 h publicado y se releen cada 3 h durante 24 h. Se guarda solo el texto.
+  4. Con al menos 15 comentarios, la IA resume en 2-3 frases neutrales lo que opinan los
+     lectores (writer.summarize_readers); como mucho cada 6 h y con 20 comentarios nuevos.
 
-Cupo gratuito de la API: 100 búsquedas al día y 10.000 unidades para lo demás (leer
-comentarios cuesta 1 unidad por página de 50).
+Cupo gratuito de la API: 10.000 unidades al día (leer los vídeos de un canal o una página
+de comentarios cuesta 1) y 100 búsquedas, que solo se usan una vez para localizar cada canal.
 """
 import json
 import logging
@@ -25,13 +23,20 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import config
-import intl
 import writer
 from textproc import STOPWORDS, fold
 
 log = logging.getLogger("youtube")
 
 API = "https://www.googleapis.com/youtube/v3/"
+
+# Canales que se vigilan (nombre tal como aparece en YouTube; se localizan una sola vez).
+WATCH_CHANNELS = [
+    "RTVE Noticias", "laSexta", "Antena 3 Noticias", "Informativos Telecinco", "EL PAÍS", "EL MUNDO",
+    "ABC", "20minutos", "El Español", "La Vanguardia", "Europa Press", "Cadena SER", "COPE",
+    "Onda Cero", "El Confidencial", "elDiario.es", "Newtral", "Agencia EFE", "La Razón", "OKDIARIO",
+    "Público", "Telemadrid", "Canal Sur", "Libertad Digital", "El Periódico", "TRECE",
+]
 
 # Canales de YouTube de medios españoles (se compara con el nombre del canal, sin tildes).
 MEDIA_CHANNELS = [
@@ -95,51 +100,107 @@ def _count_search(conn):
     conn.execute("INSERT OR REPLACE INTO kv(k, v) VALUES ('yt_searches', ?)", (f"{_quota_day()}:{used}",))
 
 
-# ---------------------------------------------------------------- búsqueda del vídeo
+# ---------------------------------------------------------------- canales y vídeos nuevos
 
-def query_terms(conn, cid, countries):
-    """Palabras para buscar la noticia: la etiqueta de la IA o sus nombres propios."""
-    c = conn.execute("SELECT tag FROM clusters WHERE id=?", (cid,)).fetchone()
-    arts = conn.execute("SELECT title, summary, entities FROM articles WHERE cluster_id=?", (cid,)).fetchall()
-    if c and c["tag"]:
-        words = [w for w in re.findall(r"[a-z0-9]+", fold(c["tag"])) if w not in STOPWORDS and len(w) > 2]
-        if words:
-            return c["tag"], words
-    texts = [f"{a['title']}. {a['summary'] or ''}" for a in arts]
-    terms = intl.search_terms([json.loads(a["entities"]) for a in arts], "es", countries, texts=texts)
-    return " ".join(terms[:3]), [fold(t) for t in terms[:3]]
-
-
-def find_videos(query, keywords, since, get=api_get, limit=2):
-    data = get("search", {
-        "part": "snippet", "type": "video", "q": query, "regionCode": "ES",
-        "relevanceLanguage": "es", "order": "relevance", "maxResults": 15,
-        "publishedAfter": datetime.fromtimestamp(since, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    })
-    need = min(2, len(keywords))
-    out = []
-    items = data.get("items", [])
-    rejected_channels, rejected_text = [], []
-    for it in items:
-        sn = it.get("snippet", {})
-        vid = (it.get("id") or {}).get("videoId")
-        if not vid:
+def resolve_channels(conn, get=api_get, max_per_cycle=30):
+    """Localiza el id de cada canal de WATCH_CHANNELS (una sola vez; se guarda en kv)."""
+    done = 0
+    for name in WATCH_CHANNELS:
+        key = "ytch:" + name
+        if conn.execute("SELECT 1 FROM kv WHERE k=?", (key,)).fetchone():
             continue
-        if not is_media_channel(sn.get("channelTitle")):
-            rejected_channels.append(sn.get("channelTitle") or "?")
-            continue
-        text = fold(f"{sn.get('title', '')} {sn.get('description', '')}")
-        if sum(1 for k in keywords if re.search(r"\b" + re.escape(k) + r"\b", text)) < need:
-            rejected_text.append(f"{sn.get('channelTitle')}: {sn.get('title', '')[:60]}")
-            continue
-        pub = sn.get("publishedAt")
-        out.append({"video_id": vid, "channel": sn.get("channelTitle"), "title": sn.get("title"),
-                    "published_at": datetime.fromisoformat(pub.replace("Z", "+00:00")).timestamp() if pub else None})
-        if len(out) >= limit:
+        if done >= max_per_cycle or searches_left(conn) <= 0:
             break
-    log.info("YouTube: «%s» · %d resultados · descartados por canal: %s · por no encajar: %s",
-             query, len(items), ", ".join(rejected_channels[:8]) or "-", " | ".join(rejected_text[:4]) or "-")
+        _count_search(conn)
+        data = get("search", {"part": "snippet", "type": "channel", "q": name, "regionCode": "ES", "maxResults": 5})
+        want = set(re.findall(r"[a-z0-9]+", fold(name)))
+        found = "-"
+        for it in data.get("items", []):
+            sn = it.get("snippet", {})
+            title = sn.get("channelTitle") or sn.get("title") or ""
+            cid = (it.get("id") or {}).get("channelId") or sn.get("channelId")
+            if cid and want <= set(re.findall(r"[a-z0-9]+", fold(title))):
+                found = f"{cid}|{title}"
+                break
+        conn.execute("INSERT OR REPLACE INTO kv(k, v) VALUES (?, ?)", (key, found))
+        log.info("YouTube: canal «%s» -> %s", name, found)
+        done += 1
+    conn.commit()
+    return done
+
+
+def watched_channels(conn):
+    out = []
+    for (v,) in conn.execute("SELECT v FROM kv WHERE k LIKE 'ytch:%' AND v != '-'"):
+        cid, _, title = v.partition("|")
+        out.append((cid, title))
     return out
+
+
+def poll_uploads(conn, now, get=api_get):
+    """Últimos vídeos de cada canal vigilado (1 unidad por canal), cada YT_POLL_MIN minutos."""
+    row = conn.execute("SELECT v FROM kv WHERE k='yt_polled'").fetchone()
+    if row and now - float(row[0]) < config.YT_POLL_MIN * 60:
+        return []
+    new = []
+    for cid, title in watched_channels(conn):
+        try:
+            data = get("playlistItems", {"part": "snippet", "playlistId": "UU" + cid[2:], "maxResults": 20})
+        except YouTubeError as e:
+            log.warning("YouTube: no se pudieron leer los vídeos de %s (%s)", title, e)
+            continue
+        for it in data.get("items", []):
+            sn = it.get("snippet", {})
+            vid = (sn.get("resourceId") or {}).get("videoId")
+            pub = sn.get("publishedAt")
+            ts = datetime.fromisoformat(pub.replace("Z", "+00:00")).timestamp() if pub else now
+            if not vid or now - ts > 24 * 3600:
+                continue
+            cur = conn.execute(
+                """INSERT OR IGNORE INTO yt_pool(video_id, channel, title, description, published_at, seen_at)
+                   VALUES (?,?,?,?,?,?)""",
+                (vid, title, sn.get("title") or "", (sn.get("description") or "")[:800], ts, now))
+            if cur.rowcount:
+                new.append(vid)
+    conn.execute("INSERT OR REPLACE INTO kv(k, v) VALUES ('yt_polled', ?)", (str(now),))
+    conn.execute("DELETE FROM yt_pool WHERE seen_at < ?", (now - 48 * 3600,))
+    conn.commit()
+    return new
+
+
+def match_videos(conn, now):
+    """Asigna los vídeos aún sin noticia a la noticia nueva y relevante que mejor encaja."""
+    from clustering import vectorize
+    from textproc import article_features
+    from worker import load_state   # import tardío: worker importa este módulo
+    pool = conn.execute("SELECT * FROM yt_pool WHERE cluster_id IS NULL AND seen_at >= ?",
+                        (now - 24 * 3600,)).fetchall()
+    if not pool:
+        return 0
+    feats = [article_features(v["title"], v["description"]) for v in pool]
+    corpus, matcher = load_state(conn, now, [f for f, _ in feats])
+    eligible = {r[0]: r[1] for r in conn.execute(
+        """SELECT id, first_published FROM clusters WHERE status='active'
+           AND (n_sources >= ? OR breaking_at IS NOT NULL) AND first_published >= ?""",
+        (config.YT_MIN_SOURCES, now - config.YT_NEW_HOURS * 3600))}
+    matched = 0
+    for v, (f, ents) in zip(pool, feats):
+        cl, score = matcher.best_match(vectorize(f, corpus), ents, v["published_at"])
+        conn.execute("UPDATE yt_pool SET cluster_id=-1 WHERE video_id=?", (v["video_id"],))  # revisado
+        if cl is None or score < config.YT_MATCH_THRESHOLD or cl.id not in eligible:
+            continue
+        if v["published_at"] < (eligible[cl.id] or 0) - 6 * 3600:
+            continue  # vídeo anterior a la noticia
+        if conn.execute("SELECT COUNT(*) FROM yt_videos WHERE cluster_id=?", (cl.id,)).fetchone()[0] >= 3:
+            continue
+        conn.execute("UPDATE yt_pool SET cluster_id=? WHERE video_id=?", (cl.id, v["video_id"]))
+        conn.execute(
+            """INSERT OR IGNORE INTO yt_videos(video_id, cluster_id, channel, title, published_at, found_at)
+               VALUES (?,?,?,?,?,?)""", (v["video_id"], cl.id, v["channel"], v["title"], v["published_at"], now))
+        log.info("YouTube: vídeo «%s» (%s) -> noticia %s (%.2f)", v["title"][:70], v["channel"], cl.id, score)
+        matched += 1
+    conn.commit()
+    return matched
 
 
 def fetch_comments(video_id, get=api_get):
@@ -161,46 +222,21 @@ def fetch_comments(video_id, get=api_get):
 
 # ---------------------------------------------------------------- ciclo
 
-def process(conn, now, get=api_get, countries=None):
+def process(conn, now, get=api_get, countries=None):   # countries: ya no se usa (compatibilidad)
     """Busca vídeos de las noticias relevantes y relee sus comentarios. Devuelve estadísticas."""
-    stats = {"searched": 0, "videos": 0, "comments": 0}
+    stats = {"searched": 0, "videos": 0, "comments": 0}   # searched = vídeos nuevos vistos en los canales
     if not config.YOUTUBE_API_KEY and get is api_get:
         return stats
-    countries = countries if countries is not None else intl.load_countries()
 
-    # 1) buscar el vídeo de las noticias nuevas que aún no lo tienen (un reintento a las 6 h)
-    budget = min(config.YT_SEARCHES_PER_CYCLE, searches_left(conn))
-    rows = conn.execute(
-        """SELECT c.id, c.first_published FROM clusters c
-           WHERE c.status='active' AND (c.n_sources >= ? OR c.breaking_at IS NOT NULL)
-             AND c.first_published >= ?          -- solo noticias nuevas
-             AND (c.yt_checked_at IS NULL
-                  OR (c.yt_checked_at < ? AND NOT EXISTS (SELECT 1 FROM yt_videos v WHERE v.cluster_id = c.id)))
-           ORDER BY c.relevance DESC LIMIT ?""",
-        (config.YT_MIN_SOURCES, now - config.YT_NEW_HOURS * 3600, now - 6 * 3600, max(0, budget))).fetchall()
-    for r in rows:
-        query, keywords = query_terms(conn, r["id"], countries)
-        if not keywords:
-            conn.execute("UPDATE clusters SET yt_checked_at=? WHERE id=?", (now, r["id"]))
-            continue
-        try:
-            _count_search(conn)
-            videos = find_videos(query, keywords, (r["first_published"] or now) - 12 * 3600, get)
-        except YouTubeError as e:
-            log.warning("YouTube: búsqueda fallida (%s)", e)
-            if e.reason in ("quotaExceeded", "dailyLimitExceeded"):
-                conn.execute("INSERT OR REPLACE INTO kv(k, v) VALUES ('yt_searches', ?)",
-                             (f"{_quota_day()}:{config.YT_SEARCHES_PER_DAY}",))
-            break
-        stats["searched"] += 1
-        for v in videos:
-            conn.execute(
-                """INSERT OR IGNORE INTO yt_videos(video_id, cluster_id, channel, title, published_at, found_at)
-                   VALUES (?,?,?,?,?,?)""", (v["video_id"], r["id"], v["channel"], v["title"], v["published_at"], now))
-            stats["videos"] += 1
-        conn.execute("UPDATE clusters SET yt_checked_at=? WHERE id=?", (now, r["id"]))
-        log.info("YouTube: noticia %s · «%s» -> %d vídeos", r["id"], query, len(videos))
-        conn.commit()
+    # 1) localizar canales (una vez), leer sus vídeos nuevos y asignarlos a noticias
+    try:
+        resolve_channels(conn, get)
+        stats["searched"] = len(poll_uploads(conn, now, get))
+        stats["videos"] = match_videos(conn, now)
+    except YouTubeError as e:
+        log.warning("YouTube: %s", e)
+        if e.reason in ("quotaExceeded", "dailyLimitExceeded"):
+            return stats
 
     # 2) leer comentarios: la primera vez cuando el vídeo lleva 1 h publicado y después
     #    cada 3 h, durante las primeras 24 h desde que se encontró

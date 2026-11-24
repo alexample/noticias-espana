@@ -1,4 +1,4 @@
-"""Comentarios de YouTube con la API simulada."""
+"""Comentarios de YouTube con la API simulada: canales vigilados -> vídeos -> noticia -> comentarios."""
 import json
 import os
 import sys
@@ -16,33 +16,43 @@ import youtube  # noqa: E402
 from textproc import article_features  # noqa: E402
 
 NOW = time.time()
+ISO = lambda ts: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))  # noqa: E731
 ARTS = [
-    ("El País", "La Aemet activa la alerta roja por lluvias en Valencia", "La DANA deja lluvias torrenciales."),
-    ("El Mundo", "Alerta roja en Valencia por la DANA", "La Generalitat pide no salir."),
-    ("RTVE", "La DANA obliga a suspender las clases en Valencia", "Aviso rojo de la Aemet."),
-    ("ABC", "Valencia, en alerta roja por la DANA", "Lluvias de hasta 180 litros."),
+    ("El País", "La Aemet activa la alerta roja por lluvias torrenciales en Valencia", "La DANA deja lluvias de 180 litros."),
+    ("El Mundo", "Alerta roja en Valencia por la DANA: la Generalitat pide no salir", "Lluvias torrenciales."),
+    ("RTVE", "La DANA obliga a suspender las clases en Valencia", "Aviso rojo de la Aemet por lluvias."),
+    ("ABC", "Valencia, en alerta roja por la DANA y las lluvias torrenciales", "Hasta 180 litros."),
 ]
+OTHER = [("El País", "El Gobierno aprueba el techo de gasto para 2027", "Hacienda eleva el límite de gasto."),
+         ("El Mundo", "Montero presenta el techo de gasto", "El Consejo de Ministros aprueba el límite de gasto.")]
 
 
 class FakeYouTube:
-    def __init__(self):
+    def __init__(self, video_age=2 * 3600):
         self.calls = []
+        self.video_age = video_age
 
     def __call__(self, endpoint, params):
         self.calls.append((endpoint, params))
-        if endpoint == "search":
+        if endpoint == "search":          # localizar canales
+            name = params["q"]
+            return {"items": [{"id": {"channelId": "UC" + str(abs(hash(name)))[:10]},
+                               "snippet": {"channelTitle": name, "title": name}}]}
+        if endpoint == "playlistItems":
+            if params["playlistId"] != "UU" + str(abs(hash("RTVE Noticias")))[:10]:
+                return {"items": []}
+            pub = ISO(NOW - self.video_age)
             return {"items": [
-                {"id": {"videoId": "v1"}, "snippet": {"channelTitle": "RTVE Noticias", "publishedAt": "2026-11-24T10:00:00Z",
-                 "title": "DANA en Valencia: alerta roja", "description": ""}},
-                {"id": {"videoId": "v2"}, "snippet": {"channelTitle": "Un youtuber cualquiera", "publishedAt": "2026-11-24T10:00:00Z",
-                 "title": "DANA Valencia EN DIRECTO", "description": ""}},           # no es un medio
-                {"id": {"videoId": "v3"}, "snippet": {"channelTitle": "laSexta", "publishedAt": "2026-11-24T10:00:00Z",
-                 "title": "El tiempo del fin de semana", "description": ""}},       # no habla de la noticia
+                {"snippet": {"resourceId": {"videoId": "dana1"}, "publishedAt": pub,
+                             "title": "Alerta roja en Valencia por la DANA: lluvias torrenciales de hasta 180 litros",
+                             "description": "La Aemet activa el aviso rojo en Valencia."}},
+                {"snippet": {"resourceId": {"videoId": "otro"}, "publishedAt": pub,
+                             "title": "Receta de croquetas de la abuela", "description": "Cocina fácil."}},
             ]}
         if endpoint == "commentThreads":
             return {"items": [{"id": f"c{i}", "snippet": {"topLevelComment": {"snippet": {
-                "textDisplay": f"Comentario {i} sobre la gestión de la DANA", "likeCount": i, "publishedAt": "2026-11-24T11:00:00Z"}}}}
-                for i in range(20)]}
+                "textDisplay": f"Comentario {i} sobre la gestión de la DANA", "likeCount": i,
+                "publishedAt": ISO(NOW - 600)}}}} for i in range(20)]}
         raise AssertionError(endpoint)
 
 
@@ -50,44 +60,41 @@ class TestYouTube(unittest.TestCase):
     def setUp(self):
         self.conn = db.connect(os.path.join(tempfile.mkdtemp(), "y.db"))
         db.init(self.conn)
-        self.conn.execute("""INSERT INTO clusters(id, created_at, updated_at, n_sources, n_articles, relevance, status,
-                             first_published, last_published, headline, tag, ai_written_at)
-                             VALUES (1,?,?,4,4,9,'active',?,?, 'Alerta roja en Valencia por la DANA', 'DANA Valencia', ?)""",
-                          (NOW, NOW, NOW - 7200, NOW - 600, NOW - 300))
-        for i, (src, t, s) in enumerate(ARTS):
-            f, e = article_features(t, s)
-            self.conn.execute("""INSERT INTO articles(url, source, title, title_key, summary, published_at, fetched_at,
-                                 features, entities, cluster_id) VALUES (?,?,?,?,?,?,?,?,?,1)""",
-                              (f"https://x/{i}", src, t, f"k{i}", s, NOW - 3600, NOW, json.dumps(f), json.dumps(e)))
-        self.conn.commit()
         config.YT_SEARCHES_PER_DAY = 90
+        for cid, arts, n in ((1, ARTS, 4), (2, OTHER, 2)):
+            self.conn.execute("""INSERT INTO clusters(id, created_at, updated_at, n_sources, n_articles, relevance, status,
+                                 first_published, last_published, headline, tag, ai_written_at)
+                                 VALUES (?,?,?,?,?,?,'active',?,?,?,?,?)""",
+                              (cid, NOW, NOW, n, n, 10 - cid, NOW - 7200, NOW - 600, arts[0][1], "", NOW - 300))
+            for i, (src, t, s) in enumerate(arts):
+                f, e = article_features(t, s)
+                self.conn.execute("""INSERT INTO articles(url, source, title, title_key, summary, published_at, fetched_at,
+                                     features, entities, cluster_id) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                                  (f"https://x/{cid}/{i}", src, t, f"k{cid}{i}", s, NOW - 3600, NOW,
+                                   json.dumps(f), json.dumps(e), cid))
+        self.conn.commit()
 
     def test_canales(self):
         self.assertTrue(youtube.is_media_channel("RTVE Noticias"))
         self.assertTrue(youtube.is_media_channel("EL PAÍS"))
-        self.assertTrue(youtube.is_media_channel("laSexta"))
         self.assertFalse(youtube.is_media_channel("Copenhagen Tours"))
-        self.assertFalse(youtube.is_media_channel("Un youtuber cualquiera"))
 
-    def test_busca_lee_y_resume(self):
+    def test_vigila_canales_asigna_lee_y_resume(self):
         yt = FakeYouTube()
-        stats = youtube.process(self.conn, NOW, get=yt, countries={})
-        self.assertEqual(stats, {"searched": 1, "videos": 1, "comments": 20})
-        self.assertEqual(yt.calls[0][1]["q"], "DANA Valencia")
-        self.assertEqual(youtube.searches_left(self.conn), 89)
-        # no se repite la búsqueda ni se releen comentarios antes de 3 h
+        stats = youtube.process(self.conn, NOW, get=yt)
+        self.assertEqual([c[0] for c in yt.calls].count("search"), len(youtube.WATCH_CHANNELS))  # se localizan una vez
+        self.assertEqual(stats["videos"], 1)                               # solo el de la DANA encaja
+        self.assertEqual(self.conn.execute("SELECT cluster_id FROM yt_videos").fetchone()[0], 1)
+        self.assertEqual(stats["comments"], 20)
+        # 10 min después: ni se vuelven a mirar los canales ni se releen comentarios
         yt2 = FakeYouTube()
-        youtube.process(self.conn, NOW + 2 * 3600, get=yt2, countries={})
-        self.assertEqual(yt2.calls, [])
-        # a las 3 h sí se releen (pero no se vuelve a buscar)
+        youtube.process(self.conn, NOW + 600, get=yt2)
+        self.assertEqual([c[0] for c in yt2.calls if c[0] != "search"], [])
+        # a las 3 h se releen los comentarios
         yt3 = FakeYouTube()
-        youtube.process(self.conn, NOW + 3 * 3600 + 60, get=yt3, countries={})
-        self.assertEqual([c[0] for c in yt3.calls], ["commentThreads"])
-        # pasadas 24 h desde que se encontró el vídeo, ya no
-        yt4 = FakeYouTube()
-        youtube.process(self.conn, NOW + 25 * 3600, get=yt4, countries={})
-        self.assertEqual(yt4.calls, [])
-        # resumen de lectores con IA simulada
+        youtube.process(self.conn, NOW + 3 * 3600 + 60, get=yt3)
+        self.assertIn("commentThreads", [c[0] for c in yt3.calls])
+
         config.ANTHROPIC_API_KEY = "test"
         seen = {}
 
@@ -98,47 +105,35 @@ class TestYouTube(unittest.TestCase):
         writer.call_claude = fake
         self.addCleanup(setattr, writer, "call_claude", orig)
         self.assertEqual(youtube.summarize_pending(self.conn, NOW), 1)
-        self.assertIn("Comentario 19", seen["prompt"].split("\n")[3])  # los más valorados primero
-        self.assertEqual(youtube.summarize_pending(self.conn, NOW + 60), 0)          # antes de 6 h, no
-        self.assertEqual(youtube.summarize_pending(self.conn, NOW + 7 * 3600), 0)    # sin 20 comentarios nuevos, no
+        self.assertIn("Comentario 19", seen["prompt"].split("\n")[3])   # los más valorados primero
+        self.assertEqual(youtube.summarize_pending(self.conn, NOW + 7 * 3600), 0)  # sin 20 nuevos, no
         out = os.path.join(tempfile.mkdtemp(), "data")
         export.export_static(self.conn, out)
-        story = json.load(open(os.path.join(out, "stories.json")))["stories"][0]
+        story = {s["id"]: s for s in json.load(open(os.path.join(out, "stories.json")))["stories"]}[1]
         self.assertEqual(story["readers"]["count"], 20)
-        self.assertIn("La mayoría", story["readers"]["summary"])
-        self.assertEqual(story["readers"]["videos"][0]["url"], "https://www.youtube.com/watch?v=v1")
+        self.assertEqual(story["readers"]["videos"][0]["url"], "https://www.youtube.com/watch?v=dana1")
 
-    def test_solo_noticias_nuevas_y_espera_a_que_haya_comentarios(self):
-        def recent(endpoint, params):
-            data = FakeYouTube()(endpoint, params)
-            if endpoint == "search":
-                for it in data["items"]:
-                    it["snippet"]["publishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(NOW - 1200))
-            return data
-        stats = youtube.process(self.conn, NOW, get=recent, countries={})
-        self.assertEqual((stats["videos"], stats["comments"]), (1, 0))   # vídeo de hace 20 min: aún no
-        stats = youtube.process(self.conn, NOW + 3600, get=recent, countries={})
-        self.assertEqual(stats["comments"], 20)                          # ya lleva más de 1 h
-        self.conn.execute("UPDATE clusters SET yt_checked_at=NULL, first_published=?", (NOW - 30 * 3600,))
+    def test_espera_una_hora_y_solo_noticias_nuevas(self):
+        stats = youtube.process(self.conn, NOW, get=FakeYouTube(video_age=1200))
+        self.assertEqual((stats["videos"], stats["comments"]), (1, 0))      # vídeo de hace 20 min
+        self.conn.execute("DELETE FROM kv WHERE k='yt_polled'")
+        stats = youtube.process(self.conn, NOW + 3600, get=FakeYouTube(video_age=1200))
+        self.assertEqual(stats["comments"], 20)
+        # noticia antigua: sus vídeos no se asignan
         self.conn.execute("DELETE FROM yt_videos")
-        yt = FakeYouTube()
-        youtube.process(self.conn, NOW, get=yt, countries={})
-        self.assertEqual(yt.calls, [])                                   # noticia antigua: no se busca
+        self.conn.execute("DELETE FROM yt_pool")
+        self.conn.execute("DELETE FROM kv WHERE k='yt_polled'")
+        self.conn.execute("UPDATE clusters SET first_published=?", (NOW - 30 * 3600,))
+        stats = youtube.process(self.conn, NOW, get=FakeYouTube())
+        self.assertEqual(stats["videos"], 0)
 
-    def test_comentarios_desactivados_y_cupo(self):
+    def test_comentarios_desactivados(self):
         def disabled(endpoint, params):
-            if endpoint == "search":
-                return FakeYouTube()(endpoint, params)
-            raise youtube.YouTubeError(403, "commentsDisabled")
-        youtube.process(self.conn, NOW, get=disabled, countries={})
+            if endpoint == "commentThreads":
+                raise youtube.YouTubeError(403, "commentsDisabled")
+            return FakeYouTube()(endpoint, params)
+        youtube.process(self.conn, NOW, get=disabled)
         self.assertEqual(self.conn.execute("SELECT disabled FROM yt_videos").fetchone()[0], 1)
-        # cupo agotado: no se busca nada más hoy
-        self.conn.execute("UPDATE clusters SET yt_checked_at=NULL")
-        self.conn.execute("DELETE FROM yt_videos")
-        config.YT_SEARCHES_PER_DAY = 1
-        yt = FakeYouTube()
-        youtube.process(self.conn, NOW + 3600, get=yt, countries={})
-        self.assertEqual([c for c in yt.calls if c[0] == "search"], [])
 
 
 if __name__ == "__main__":

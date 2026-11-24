@@ -107,6 +107,16 @@ CREATE TABLE IF NOT EXISTS yt_comments (
     published_at REAL
 );
 CREATE INDEX IF NOT EXISTS idx_ytc_cluster ON yt_comments(cluster_id);
+-- Vídeos recientes de los canales vigilados, pendientes de asignar a una noticia
+CREATE TABLE IF NOT EXISTS yt_pool (
+    video_id     TEXT PRIMARY KEY,
+    channel      TEXT,
+    title        TEXT,
+    description  TEXT,
+    published_at REAL,
+    seen_at      REAL NOT NULL,
+    cluster_id   INTEGER          -- NULL = sin revisar, -1 = sin noticia
+);
 -- Contadores (cupo diario de búsquedas de YouTube)
 CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
 
