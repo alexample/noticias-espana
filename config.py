@@ -54,10 +54,14 @@ YOUTUBE_API_KEY = _env("YOUTUBE_API_KEY", "")
 YT_MIN_SOURCES = _env("YT_MIN_SOURCES", 4, int)           # solo noticias con cierta relevancia
 YT_SEARCHES_PER_DAY = _env("YT_SEARCHES_PER_DAY", 90, int)  # la API permite 100 búsquedas al día
 YT_SEARCHES_PER_CYCLE = _env("YT_SEARCHES_PER_CYCLE", 2, int)
-YT_RECHECK_MIN = _env("YT_RECHECK_MIN", 60, int)            # cada cuánto se releen los comentarios
-YT_MIN_COMMENTS = _env("YT_MIN_COMMENTS", 15, int)          # mínimo para resumir
+YT_NEW_HOURS = _env("YT_NEW_HOURS", 12, int)                 # solo noticias nuevas (de menos de 12 h)
+YT_FIRST_READ_MIN = _env("YT_FIRST_READ_MIN", 60, int)        # primera lectura: vídeo con 1 h publicado
+YT_RECHECK_MIN = _env("YT_RECHECK_MIN", 180, int)             # después, releer cada 3 h…
+YT_FOLLOW_HOURS = _env("YT_FOLLOW_HOURS", 24, int)            # …durante 24 h como máximo
+YT_MIN_COMMENTS = _env("YT_MIN_COMMENTS", 15, int)            # mínimo para resumir
 READERS_MAX_PER_CYCLE = _env("READERS_MAX_PER_CYCLE", 4, int)
-READERS_EVERY_MIN = _env("READERS_EVERY_MIN", 120, int)     # no rehacer el resumen más a menudo
+READERS_EVERY_MIN = _env("READERS_EVERY_MIN", 360, int)       # el resumen se rehace como mucho cada 6 h
+READERS_MIN_NEW = _env("READERS_MIN_NEW", 20, int)            # y solo si hay 20 comentarios nuevos o más
 
 # --- Canal de Telegram ---
 TELEGRAM_BOT_TOKEN = _env("TELEGRAM_BOT_TOKEN", "")

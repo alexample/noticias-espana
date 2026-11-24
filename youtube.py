@@ -4,6 +4,9 @@ Sin IA salvo el resumen final:
   1. Para las noticias relevantes se busca el vídeo en YouTube (API oficial de Google)
      y solo se aceptan vídeos de canales de medios españoles cuyo título encaje con la
      noticia.
+  Solo noticias nuevas (menos de 12 h). Los comentarios se leen cuando el vídeo lleva 1 h
+  publicado y se releen cada 3 h durante 24 h; el resumen se rehace como mucho cada 6 h
+  y solo si han llegado 20 comentarios nuevos o más.
   2. Se leen sus comentarios más valorados. Se guarda solo el texto y los «me gusta»:
      ni autores ni perfiles.
   3. Cuando hay suficientes comentarios, la IA escribe 2-3 frases neutrales con las
@@ -157,16 +160,16 @@ def process(conn, now, get=api_get, countries=None):
         return stats
     countries = countries if countries is not None else intl.load_countries()
 
-    # 1) buscar el vídeo de las noticias que aún no tienen
+    # 1) buscar el vídeo de las noticias nuevas que aún no lo tienen (un reintento a las 6 h)
     budget = min(config.YT_SEARCHES_PER_CYCLE, searches_left(conn))
     rows = conn.execute(
         """SELECT c.id, c.first_published FROM clusters c
            WHERE c.status='active' AND (c.n_sources >= ? OR c.breaking_at IS NOT NULL)
-             AND c.last_published >= ?
+             AND c.first_published >= ?          -- solo noticias nuevas
              AND (c.yt_checked_at IS NULL
                   OR (c.yt_checked_at < ? AND NOT EXISTS (SELECT 1 FROM yt_videos v WHERE v.cluster_id = c.id)))
            ORDER BY c.relevance DESC LIMIT ?""",
-        (config.YT_MIN_SOURCES, now - 24 * 3600, now - 6 * 3600, max(0, budget))).fetchall()
+        (config.YT_MIN_SOURCES, now - config.YT_NEW_HOURS * 3600, now - 6 * 3600, max(0, budget))).fetchall()
     for r in rows:
         query, keywords = query_terms(conn, r["id"], countries)
         if not keywords:
@@ -191,13 +194,16 @@ def process(conn, now, get=api_get, countries=None):
         log.info("YouTube: noticia %s · «%s» -> %d vídeos", r["id"], query, len(videos))
         conn.commit()
 
-    # 2) leer o releer comentarios
+    # 2) leer comentarios: la primera vez cuando el vídeo lleva 1 h publicado y después
+    #    cada 3 h, durante las primeras 24 h desde que se encontró
     vids = conn.execute(
         """SELECT v.video_id, v.cluster_id FROM yt_videos v JOIN clusters c ON c.id = v.cluster_id
            WHERE c.status='active' AND v.disabled=0 AND v.found_at >= ?
+             AND COALESCE(v.published_at, v.found_at) <= ?
              AND (v.checked_at IS NULL OR v.checked_at < ?)
            ORDER BY c.relevance DESC LIMIT 12""",
-        (now - 48 * 3600, now - config.YT_RECHECK_MIN * 60)).fetchall()
+        (now - config.YT_FOLLOW_HOURS * 3600, now - config.YT_FIRST_READ_MIN * 60,
+         now - config.YT_RECHECK_MIN * 60)).fetchall()
     for v in vids:
         try:
             comments = fetch_comments(v["video_id"], get)
@@ -231,9 +237,10 @@ def summarize_pending(conn, now):
            WHERE c.status='active' AND c.headline IS NOT NULL
              AND (c.readers_at IS NULL OR c.readers_at < ?)
            GROUP BY c.id
-           HAVING n >= ? AND (c.readers_count IS NULL OR n >= c.readers_count + 20 OR n >= c.readers_count * 1.5)
+           HAVING n >= ? AND (c.readers_count IS NULL OR n >= c.readers_count + ?)
            ORDER BY c.relevance DESC LIMIT ?""",
-        (now - config.READERS_EVERY_MIN * 60, config.YT_MIN_COMMENTS, config.READERS_MAX_PER_CYCLE)).fetchall()
+        (now - config.READERS_EVERY_MIN * 60, config.YT_MIN_COMMENTS, config.READERS_MIN_NEW,
+         config.READERS_MAX_PER_CYCLE)).fetchall()
     done = 0
     for r in rows:
         comments = [x[0] for x in conn.execute(

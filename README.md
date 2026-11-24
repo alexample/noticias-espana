@@ -133,8 +133,9 @@ mensaje original con la versión confirmada ✓✓.
 Para las noticias de 4 medios o más (y las de última hora) se busca su vídeo en YouTube
 con la API oficial, aceptando solo canales de medios españoles cuyo título encaje con la
 noticia, y se leen sus comentarios más valorados (solo el texto, sin autores). Cuando hay
-al menos 15, la IA resume en 2-3 frases neutrales lo que opinan los lectores; el resumen
-se rehace como mucho cada 2 horas y solo si llegan bastantes comentarios nuevos.
+al menos 15, la IA resume en 2-3 frases neutrales lo que opinan los lectores. Ritmo: solo
+noticias nuevas (menos de 12 h); comentarios a la hora de publicarse el vídeo y luego cada
+3 h durante 24 h; el resumen se rehace como mucho cada 6 h y con 20 comentarios nuevos o más.
 Se respeta el cupo gratuito de YouTube (100 búsquedas al día). Secreto: `YOUTUBE_API_KEY`.
 
 ## Configuración (variables de entorno)

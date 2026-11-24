@@ -75,10 +75,18 @@ class TestYouTube(unittest.TestCase):
         self.assertEqual(stats, {"searched": 1, "videos": 1, "comments": 20})
         self.assertEqual(yt.calls[0][1]["q"], "DANA Valencia")
         self.assertEqual(youtube.searches_left(self.conn), 89)
-        # no se repite la búsqueda ni se releen comentarios antes de tiempo
+        # no se repite la búsqueda ni se releen comentarios antes de 3 h
         yt2 = FakeYouTube()
-        youtube.process(self.conn, NOW + 60, get=yt2, countries={})
+        youtube.process(self.conn, NOW + 2 * 3600, get=yt2, countries={})
         self.assertEqual(yt2.calls, [])
+        # a las 3 h sí se releen (pero no se vuelve a buscar)
+        yt3 = FakeYouTube()
+        youtube.process(self.conn, NOW + 3 * 3600 + 60, get=yt3, countries={})
+        self.assertEqual([c[0] for c in yt3.calls], ["commentThreads"])
+        # pasadas 24 h desde que se encontró el vídeo, ya no
+        yt4 = FakeYouTube()
+        youtube.process(self.conn, NOW + 25 * 3600, get=yt4, countries={})
+        self.assertEqual(yt4.calls, [])
         # resumen de lectores con IA simulada
         config.ANTHROPIC_API_KEY = "test"
         seen = {}
@@ -91,13 +99,31 @@ class TestYouTube(unittest.TestCase):
         self.addCleanup(setattr, writer, "call_claude", orig)
         self.assertEqual(youtube.summarize_pending(self.conn, NOW), 1)
         self.assertIn("Comentario 19", seen["prompt"].split("\n")[3])  # los más valorados primero
-        self.assertEqual(youtube.summarize_pending(self.conn, NOW + 60), 0)  # sin comentarios nuevos
+        self.assertEqual(youtube.summarize_pending(self.conn, NOW + 60), 0)          # antes de 6 h, no
+        self.assertEqual(youtube.summarize_pending(self.conn, NOW + 7 * 3600), 0)    # sin 20 comentarios nuevos, no
         out = os.path.join(tempfile.mkdtemp(), "data")
         export.export_static(self.conn, out)
         story = json.load(open(os.path.join(out, "stories.json")))["stories"][0]
         self.assertEqual(story["readers"]["count"], 20)
         self.assertIn("La mayoría", story["readers"]["summary"])
         self.assertEqual(story["readers"]["videos"][0]["url"], "https://www.youtube.com/watch?v=v1")
+
+    def test_solo_noticias_nuevas_y_espera_a_que_haya_comentarios(self):
+        def recent(endpoint, params):
+            data = FakeYouTube()(endpoint, params)
+            if endpoint == "search":
+                for it in data["items"]:
+                    it["snippet"]["publishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(NOW - 1200))
+            return data
+        stats = youtube.process(self.conn, NOW, get=recent, countries={})
+        self.assertEqual((stats["videos"], stats["comments"]), (1, 0))   # vídeo de hace 20 min: aún no
+        stats = youtube.process(self.conn, NOW + 3600, get=recent, countries={})
+        self.assertEqual(stats["comments"], 20)                          # ya lleva más de 1 h
+        self.conn.execute("UPDATE clusters SET yt_checked_at=NULL, first_published=?", (NOW - 30 * 3600,))
+        self.conn.execute("DELETE FROM yt_videos")
+        yt = FakeYouTube()
+        youtube.process(self.conn, NOW, get=yt, countries={})
+        self.assertEqual(yt.calls, [])                                   # noticia antigua: no se busca
 
     def test_comentarios_desactivados_y_cupo(self):
         def disabled(endpoint, params):
