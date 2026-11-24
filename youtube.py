@@ -118,19 +118,27 @@ def find_videos(query, keywords, since, get=api_get, limit=2):
     })
     need = min(2, len(keywords))
     out = []
-    for it in data.get("items", []):
+    items = data.get("items", [])
+    rejected_channels, rejected_text = [], []
+    for it in items:
         sn = it.get("snippet", {})
         vid = (it.get("id") or {}).get("videoId")
-        if not vid or not is_media_channel(sn.get("channelTitle")):
+        if not vid:
+            continue
+        if not is_media_channel(sn.get("channelTitle")):
+            rejected_channels.append(sn.get("channelTitle") or "?")
             continue
         text = fold(f"{sn.get('title', '')} {sn.get('description', '')}")
         if sum(1 for k in keywords if re.search(r"\b" + re.escape(k) + r"\b", text)) < need:
+            rejected_text.append(f"{sn.get('channelTitle')}: {sn.get('title', '')[:60]}")
             continue
         pub = sn.get("publishedAt")
         out.append({"video_id": vid, "channel": sn.get("channelTitle"), "title": sn.get("title"),
                     "published_at": datetime.fromisoformat(pub.replace("Z", "+00:00")).timestamp() if pub else None})
         if len(out) >= limit:
             break
+    log.info("YouTube: «%s» · %d resultados · descartados por canal: %s · por no encajar: %s",
+             query, len(items), ", ".join(rejected_channels[:8]) or "-", " | ".join(rejected_text[:4]) or "-")
     return out
 
 
@@ -222,6 +230,8 @@ def process(conn, now, get=api_get, countries=None):
         n = conn.execute("SELECT COUNT(*) FROM yt_comments WHERE video_id=?", (v["video_id"],)).fetchone()[0]
         conn.execute("UPDATE yt_videos SET checked_at=?, comment_count=? WHERE video_id=?", (now, n, v["video_id"]))
         stats["comments"] += len(comments)
+        log.info("YouTube: vídeo %s (noticia %s) · %d comentarios leídos, %d guardados", v["video_id"],
+                 v["cluster_id"], len(comments), n)
         conn.commit()
     conn.commit()
     return stats
