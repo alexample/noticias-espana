@@ -160,16 +160,21 @@ READERS_SYSTEM = (
 
 READERS_PROMPT = """Noticia: {headline}
 
-Comentarios de lectores en YouTube (ordenados de más a menos valorados; puede haber ruido):
+Comentarios de lectores en vídeos de YouTube de {channels}. Van mezclados por turnos entre canales, los más valorados de cada uno primero; entre corchetes, el canal. Puede haber ruido:
 {comments}
 
-Resume en 2-3 frases (máximo 70 palabras) qué opinan los lectores. Si las opiniones están muy divididas, dilo. Devuelve SOLO un JSON: {{"resumen": "..."}}"""
+Resume en 2-3 frases (máximo 70 palabras) qué opinan los lectores. Si las opiniones están muy divididas, dilo. Si los comentarios de un canal se inclinan claramente hacia una postura distinta de los de otro, tenlo en cuenta y no la presentes como la opinión general (puedes decir, por ejemplo, que en un canal predomina una postura y en otro la contraria). Devuelve SOLO un JSON: {{"resumen": "..."}}"""
 
 
 def summarize_readers(headline, comments):
-    """Resumen de lo que opinan los lectores (comentarios de YouTube). Devuelve el texto."""
-    lines = "\n".join(f"- {c.strip()[:300]}" for c in comments if c.strip())
-    text = call_claude(READERS_PROMPT.format(headline=headline, comments=lines), READERS_SYSTEM, max_tokens=400)
+    """Resumen de lo que opinan los lectores (comentarios de YouTube).
+    comments: [(canal, texto)] o [texto]. Devuelve el texto del resumen."""
+    pairs = [c if isinstance(c, tuple) else ("YouTube", c) for c in comments]
+    channels = list(dict.fromkeys(ch for ch, _ in pairs))
+    lines = "\n".join(f"- [{ch}] {t.strip()[:300]}" for ch, t in pairs if t.strip())
+    names = ", ".join(channels[:-1]) + " y " + channels[-1] if len(channels) > 1 else (channels[0] if channels else "medios")
+    text = call_claude(READERS_PROMPT.format(headline=headline, comments=lines, channels=names),
+                       READERS_SYSTEM, max_tokens=400)
     start, end = text.find("{"), text.rfind("}")
     obj = json.loads(text[start:end + 1], strict=False)
     summary = (obj.get("resumen") or "").strip()

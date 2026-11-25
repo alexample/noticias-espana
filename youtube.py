@@ -7,7 +7,7 @@ Sin IA salvo el resumen final:
      (título y descripción del vídeo frente a las noticias activas).
   3. Solo noticias nuevas (menos de 24 h) de 2 medios o más. Los comentarios se leen cuando el
      vídeo lleva 1 h publicado y se releen cada 3 h durante 24 h. Se guarda solo el texto.
-  4. Con al menos 8 comentarios, la IA resume en 2-3 frases neutrales lo que opinan los
+  4. Con al menos 8 comentarios (mezclando por turnos los de todos los canales), la IA resume en 2-3 frases neutrales lo que opinan los
      lectores (writer.summarize_readers); como mucho cada 6 h y con 20 comentarios nuevos.
 
 Cupo gratuito de la API: 10.000 unidades al día (leer los vídeos de un canal o una página
@@ -292,31 +292,49 @@ def process(conn, now, get=api_get, countries=None):   # countries: ya no se usa
     return stats
 
 
+def mixed_comments(conn, cid, limit=60):
+    """Comentarios de todos los vídeos de la noticia, por turnos entre canales (los más
+    valorados de cada uno), para que no domine el público de un solo canal.
+    Devuelve [(canal, texto)]."""
+    by_channel = {}
+    for ch, text in conn.execute(
+            """SELECT v.channel, y.text FROM yt_comments y JOIN yt_videos v ON v.video_id = y.video_id
+               WHERE y.cluster_id=? ORDER BY y.likes DESC""", (cid,)):
+        by_channel.setdefault(ch or "?", []).append(text)
+    out, i = [], 0
+    while len(out) < limit and any(i < len(v) for v in by_channel.values()):
+        for ch, texts in by_channel.items():
+            if i < len(texts) and len(out) < limit:
+                out.append((ch, texts[i]))
+        i += 1
+    return out
+
+
 def summarize_pending(conn, now):
     """Pide a la IA el resumen «Qué dicen los lectores» donde hay comentarios nuevos suficientes."""
     if not writer.ai_enabled():
         return 0
     rows = conn.execute(
-        """SELECT c.id, c.headline, c.readers_count, COUNT(y.comment_id) AS n
+        """SELECT c.id, c.headline, c.readers_count, COUNT(y.comment_id) AS n, COUNT(DISTINCT y.video_id) AS nv
            FROM clusters c JOIN yt_comments y ON y.cluster_id = c.id
            WHERE c.status='active' AND c.headline IS NOT NULL
              AND (c.readers_at IS NULL OR c.readers_at < ?)
            GROUP BY c.id
-           HAVING n >= ? AND (c.readers_count IS NULL OR n >= c.readers_count + ?)
+           HAVING n >= ? AND (c.readers_count IS NULL OR n >= c.readers_count + ?
+                              OR nv > COALESCE(c.readers_videos, 1))   -- vídeo de otro canal: rehacer mezclando
            ORDER BY c.relevance DESC LIMIT ?""",
         (now - config.READERS_EVERY_MIN * 60, config.YT_MIN_COMMENTS, config.READERS_MIN_NEW,
          config.READERS_MAX_PER_CYCLE)).fetchall()
     done = 0
     for r in rows:
-        comments = [x[0] for x in conn.execute(
-            "SELECT text FROM yt_comments WHERE cluster_id=? ORDER BY likes DESC LIMIT 60", (r["id"],))]
+        comments = mixed_comments(conn, r["id"])
         try:
             summary = writer.summarize_readers(r["headline"], comments)
         except Exception as e:
             log.warning("IA: resumen de lectores falló en noticia %s: %s", r["id"], e)
             continue
-        conn.execute("UPDATE clusters SET readers_summary=?, readers_count=?, readers_at=? WHERE id=?",
-                     (summary, r["n"], now, r["id"]))
+        conn.execute("UPDATE clusters SET readers_summary=?, readers_count=?, readers_at=?, readers_videos=? WHERE id=?",
+                     (summary, r["n"], now, r["nv"], r["id"]))
         conn.commit()
         done += 1
         log.info("Lectores: noticia %s · %d comentarios · %s", r["id"], r["n"], summary)

@@ -105,7 +105,9 @@ class TestYouTube(unittest.TestCase):
         writer.call_claude = fake
         self.addCleanup(setattr, writer, "call_claude", orig)
         self.assertEqual(youtube.summarize_pending(self.conn, NOW), 1)
-        self.assertIn("Comentario 19", seen["prompt"].split("\n")[3])   # los más valorados primero
+        first = [l for l in seen["prompt"].split("\n") if l.startswith("- [")][0]
+        self.assertIn("Comentario 19", first)   # los más valorados primero
+        self.assertIn("[RTVE Noticias]", first)
         self.assertEqual(youtube.summarize_pending(self.conn, NOW + 7 * 3600), 0)  # sin 20 nuevos, no
         out = os.path.join(tempfile.mkdtemp(), "data")
         export.export_static(self.conn, out)
@@ -138,6 +140,17 @@ class TestYouTube(unittest.TestCase):
         stats = youtube.process(self.conn, NOW + 600, get=yt)
         self.assertEqual(stats["videos"], 1)
         self.assertNotIn("playlistItems", [c[0] for c in yt.calls])
+
+    def test_mezcla_por_turnos_entre_canales(self):
+        self.conn.execute("INSERT INTO yt_videos(video_id, cluster_id, channel, found_at) VALUES ('a',1,'Canal A',?)", (NOW,))
+        self.conn.execute("INSERT INTO yt_videos(video_id, cluster_id, channel, found_at) VALUES ('b',1,'Canal B',?)", (NOW,))
+        for i in range(40):
+            self.conn.execute("INSERT INTO yt_comments VALUES (?, 'a', 1, ?, ?, NULL)", (f"a{i}", f"A{i}", 100 - i))
+        for i in range(3):
+            self.conn.execute("INSERT INTO yt_comments VALUES (?, 'b', 1, ?, ?, NULL)", (f"b{i}", f"B{i}", 1))
+        mixed = youtube.mixed_comments(self.conn, 1, limit=8)
+        self.assertEqual([t for _, t in mixed], ["A0", "B0", "A1", "B1", "A2", "B2", "A3", "A4"])
+        self.assertEqual(mixed[1][0], "Canal B")
 
     def test_comentarios_desactivados(self):
         def disabled(endpoint, params):

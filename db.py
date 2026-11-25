@@ -148,7 +148,7 @@ def init(conn):
     cols = {r[1] for r in conn.execute("PRAGMA table_info(clusters)")}
     for name, kind in (("tag", "TEXT"), ("intl_countries", "TEXT"), ("intl_checked_at", "REAL"),
                        ("breaking_at", "REAL"), ("yt_checked_at", "REAL"), ("readers_summary", "TEXT"),
-                       ("readers_count", "INTEGER"), ("readers_at", "REAL")):
+                       ("readers_count", "INTEGER"), ("readers_at", "REAL"), ("readers_videos", "INTEGER")):
         if name not in cols:
             conn.execute(f"ALTER TABLE clusters ADD COLUMN {name} {kind}")
     tcols = {r[1] for r in conn.execute("PRAGMA table_info(telegram_posts)")}
