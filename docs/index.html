@@ -208,6 +208,7 @@ function card(s, i) {
         ${shown.map(x => `<span class="chip">${esc(x)}</span>`).join("")}
         ${more > 0 ? `<span>+${more}</span>` : ""}
         ${(s.intl || []).length ? `<span class="chip world" title="Cobertura internacional">${s.intl.map(c => c.flag).join(" ")}</span>` : ""}
+        ${s.readers ? `<span class="chip world" title="Incluye lo que opinan los lectores">💬 Lectores</span>` : ""}
         <span>· ${ago(s.last_published)}</span>
       </div>
     </div></a>`;

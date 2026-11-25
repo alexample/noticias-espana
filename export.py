@@ -4,6 +4,7 @@
   docs/data/status.json   estado de los medios
 """
 import html
+import logging
 import json
 import os
 import time
@@ -19,6 +20,8 @@ def _write(path, obj):
         json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
     os.replace(tmp, path)
 
+
+log = logging.getLogger("export")
 
 WINDOW_S = 30 * 60   # artículos publicados en la misma media hora forman un único momento
 MAX_EVENTS = 30
@@ -258,6 +261,9 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
     merged = {str(r["id"]): r["merged_into"] for r in conn.execute(
         "SELECT id, merged_into FROM clusters WHERE status='merged' AND updated_at >= ?", (now - hours * 3600,))}
     _write(os.path.join(out_dir, "stories.json"), {"generated_at": now, "stories": stories, "merged": merged})
+    with_readers = [s["id"] for s in stories if s.get("readers")]
+    log.info("Exportadas %d noticias; con «Qué dicen los lectores»: %s", len(stories),
+             ", ".join(map(str, with_readers)) or "ninguna")
     _write(os.path.join(out_dir, "feed.json"), app_feed(stories, merged, now))
     write_share_pages(conn, os.path.join(os.path.dirname(os.path.abspath(out_dir)), "n"), config.SITE_URL)
 
