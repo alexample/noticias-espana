@@ -186,10 +186,23 @@ def match_videos(conn, now):
            AND (n_sources >= ? OR breaking_at IS NOT NULL) AND first_published >= ?""",
         (config.YT_MIN_SOURCES, now - config.YT_NEW_HOURS * 3600))}
     matched = 0
+    near = []   # diagnóstico: los mejores candidatos que no se asignaron
     for v, (f, ents) in zip(pool, feats):
-        cl, score = matcher.best_match(vectorize(f, corpus), ents, v["published_at"])
+        vec = vectorize(f, corpus)
+        # mejor noticia ELEGIBLE (no basta con la mejor en general: puede ser una pequeña)
+        best, score = None, 0.0
+        for cid in eligible:
+            cl = matcher.clusters.get(cid)
+            if cl is None:
+                continue
+            sc = matcher.score(vec, ents, v["published_at"], cl)
+            if sc > score:
+                best, score = cl, sc
+        cl = best
         conn.execute("UPDATE yt_pool SET cluster_id=-1 WHERE video_id=?", (v["video_id"],))  # revisado
-        if cl is None or score < config.YT_MATCH_THRESHOLD or cl.id not in eligible:
+        if cl is None or score < config.YT_MATCH_THRESHOLD:
+            if cl is not None:
+                near.append((score, v["title"][:60], cl.id))
             continue
         if v["published_at"] < (eligible[cl.id] or 0) - 6 * 3600:
             continue  # vídeo anterior a la noticia
@@ -202,7 +215,10 @@ def match_videos(conn, now):
         log.info("YouTube: vídeo «%s» (%s) -> noticia %s (%.2f)", v["title"][:70], v["channel"], cl.id, score)
         matched += 1
     conn.commit()
-    log.info("YouTube: %d vídeos recientes sin noticia revisados, %d asignados", len(pool), matched)
+    near.sort(reverse=True)
+    log.info("YouTube: %d vídeos recientes sin noticia revisados (%d noticias elegibles, %d en memoria), "
+             "%d asignados · casi: %s", len(pool), len(eligible), len(matcher.clusters), matched,
+             " | ".join(f"{sc:.2f} «{t}» -> {c}" for sc, t, c in near[:6]) or "-")
     return matched
 
 
