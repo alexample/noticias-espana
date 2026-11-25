@@ -5,9 +5,9 @@ Sin IA salvo el resumen final:
      sus últimos vídeos (la búsqueda general de YouTube no encuentra bien estos vídeos).
   2. Cada vídeo se asigna a su noticia con el mismo algoritmo que agrupa los artículos
      (título y descripción del vídeo frente a las noticias activas).
-  3. Solo noticias nuevas y relevantes. Los comentarios más valorados se leen cuando el
+  3. Solo noticias nuevas (menos de 24 h) de 2 medios o más. Los comentarios se leen cuando el
      vídeo lleva 1 h publicado y se releen cada 3 h durante 24 h. Se guarda solo el texto.
-  4. Con al menos 15 comentarios, la IA resume en 2-3 frases neutrales lo que opinan los
+  4. Con al menos 8 comentarios, la IA resume en 2-3 frases neutrales lo que opinan los
      lectores (writer.summarize_readers); como mucho cada 6 h y con 20 comentarios nuevos.
 
 Cupo gratuito de la API: 10.000 unidades al día (leer los vídeos de un canal o una página
@@ -173,8 +173,10 @@ def match_videos(conn, now):
     from clustering import vectorize
     from textproc import article_features
     from worker import load_state   # import tardío: worker importa este módulo
-    pool = conn.execute("SELECT * FROM yt_pool WHERE cluster_id IS NULL AND seen_at >= ?",
-                        (now - 24 * 3600,)).fetchall()
+    # vídeos sin noticia de las últimas 12 h: se reintentan en cada pasada, porque a menudo
+    # el vídeo sale antes de que la noticia tenga suficientes medios
+    pool = conn.execute("SELECT * FROM yt_pool WHERE (cluster_id IS NULL OR cluster_id = -1) AND seen_at >= ?",
+                        (now - 12 * 3600,)).fetchall()
     if not pool:
         return 0
     feats = [article_features(v["title"], v["description"]) for v in pool]
@@ -200,6 +202,7 @@ def match_videos(conn, now):
         log.info("YouTube: vídeo «%s» (%s) -> noticia %s (%.2f)", v["title"][:70], v["channel"], cl.id, score)
         matched += 1
     conn.commit()
+    log.info("YouTube: %d vídeos recientes sin noticia revisados, %d asignados", len(pool), matched)
     return matched
 
 

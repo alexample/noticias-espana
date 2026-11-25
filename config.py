@@ -51,15 +51,15 @@ INTL_MAX_PER_COUNTRY = 6
 
 # --- Comentarios de YouTube ("Qué dicen los lectores") ---
 YOUTUBE_API_KEY = _env("YOUTUBE_API_KEY", "")
-YT_MIN_SOURCES = _env("YT_MIN_SOURCES", 4, int)           # solo noticias con cierta relevancia
+YT_MIN_SOURCES = _env("YT_MIN_SOURCES", 2, int)           # solo noticias con cierta relevancia
 YT_SEARCHES_PER_DAY = _env("YT_SEARCHES_PER_DAY", 90, int)  # la API permite 100 búsquedas al día
 YT_POLL_MIN = _env("YT_POLL_MIN", 30, int)                  # cada cuánto se miran los canales de los medios
-YT_MATCH_THRESHOLD = _env("YT_MATCH_THRESHOLD", 0.26, float)  # parecido mínimo vídeo-noticia
-YT_NEW_HOURS = _env("YT_NEW_HOURS", 12, int)                 # solo noticias nuevas (de menos de 12 h)
+YT_MATCH_THRESHOLD = _env("YT_MATCH_THRESHOLD", 0.24, float)  # parecido mínimo vídeo-noticia (como el de agrupar)
+YT_NEW_HOURS = _env("YT_NEW_HOURS", 24, int)                 # solo noticias nuevas (de menos de 24 h)
 YT_FIRST_READ_MIN = _env("YT_FIRST_READ_MIN", 60, int)        # primera lectura: vídeo con 1 h publicado
 YT_RECHECK_MIN = _env("YT_RECHECK_MIN", 180, int)             # después, releer cada 3 h…
 YT_FOLLOW_HOURS = _env("YT_FOLLOW_HOURS", 24, int)            # …durante 24 h como máximo
-YT_MIN_COMMENTS = _env("YT_MIN_COMMENTS", 15, int)            # mínimo para resumir
+YT_MIN_COMMENTS = _env("YT_MIN_COMMENTS", 8, int)             # mínimo para resumir
 READERS_MAX_PER_CYCLE = _env("READERS_MAX_PER_CYCLE", 4, int)
 READERS_EVERY_MIN = _env("READERS_EVERY_MIN", 360, int)       # el resumen se rehace como mucho cada 6 h
 READERS_MIN_NEW = _env("READERS_MIN_NEW", 20, int)            # y solo si hay 20 comentarios nuevos o más

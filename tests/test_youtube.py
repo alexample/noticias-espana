@@ -127,6 +127,18 @@ class TestYouTube(unittest.TestCase):
         stats = youtube.process(self.conn, NOW, get=FakeYouTube())
         self.assertEqual(stats["videos"], 0)
 
+    def test_video_anterior_a_que_la_noticia_sea_relevante(self):
+        # la noticia aún tiene 1 medio: el vídeo no se asigna…
+        self.conn.execute("UPDATE clusters SET n_sources=1 WHERE id=1")
+        stats = youtube.process(self.conn, NOW, get=FakeYouTube())
+        self.assertEqual(stats["videos"], 0)
+        # …pero cuando llega a 2 medios, el mismo vídeo se asigna sin volver a pedirlo a YouTube
+        self.conn.execute("UPDATE clusters SET n_sources=2 WHERE id=1")
+        yt = FakeYouTube()
+        stats = youtube.process(self.conn, NOW + 600, get=yt)
+        self.assertEqual(stats["videos"], 1)
+        self.assertNotIn("playlistItems", [c[0] for c in yt.calls])
+
     def test_comentarios_desactivados(self):
         def disabled(endpoint, params):
             if endpoint == "commentThreads":
