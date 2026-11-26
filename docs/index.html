@@ -214,11 +214,14 @@ function card(s, i) {
 }
 
 // Noticias "en desarrollo": las que más artículos nuevos han recibido en las últimas 2 horas.
-function hotStrip() {
-  const hot = DATA.stories
+function hotStories() {
+  return DATA.stories
     .filter(s => (s.n_sources >= 2 && (s.recent_articles || 0) >= 2) || (s.breaking && (s.recent_articles || 0) >= 1))
     .sort((a, b) => (b.recent_sources - a.recent_sources) || (b.recent_articles - a.recent_articles) || (b.relevance - a.relevance))
     .slice(0, 10);
+}
+function hotStrip() {
+  const hot = hotStories();
   if (!hot.length) return "";
   const label = s => s.tag || (s.headline.split(/\s+/).slice(0, 5).join(" ") + (s.headline.split(/\s+/).length > 5 ? "…" : ""));
   return `<nav class="hot" aria-label="Noticias en desarrollo">
@@ -231,11 +234,17 @@ function renderList() {
   $("#bar").style.display = "";
   document.title = "DobleCheck · Noticias contrastadas en todos los medios";
   const since = Date.now() / 1000 - state.hours * 3600, q = fold(state.q.trim());
-  // última hora: aparece aunque la tenga un solo medio, y las de las 2 últimas horas van arriba
+  // última hora: aparece aunque la tenga un solo medio
   const pinned = s => s.breaking && s.last_published >= Date.now() / 1000 - 2 * 3600;
   const list = DATA.stories.filter(s => (s.n_sources >= state.min || (s.breaking && state.min <= 2)) && s.last_published >= since &&
     (!q || fold(s.headline + " " + s.lead + " " + s.articles.map(a => a.title).join(" ")).includes(q)));
-  list.sort((a, b) => (pinned(b) - pinned(a)) || (pinned(a) && pinned(b) ? b.last_published - a.last_published : 0));
+  // orden: 1) última hora de las 2 últimas horas (la más reciente arriba), 2) las de «En desarrollo»
+  // en el mismo orden que sus etiquetas, 3) el resto por relevancia
+  const hotRank = new Map(hotStories().map((s, i) => [s.id, i]));
+  const group = s => pinned(s) ? 0 : hotRank.has(s.id) ? 1 : 2;
+  list.sort((a, b) => (group(a) - group(b))
+    || (group(a) === 0 ? b.last_published - a.last_published : 0)
+    || (group(a) === 1 ? hotRank.get(a.id) - hotRank.get(b.id) : 0));
   $("#app").innerHTML = DATA.error
     ? `<div class="empty">Aún no hay datos. El robot los publicará en su próxima pasada.</div>`
     : list.length
