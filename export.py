@@ -188,14 +188,20 @@ def export_static(conn, out_dir=None, hours=48, limit=400):
     foreign, updates, readers = {}, {}, {}
     if ids:
         vids = {}
-        for v in conn.execute(f"""SELECT cluster_id, video_id, channel, title FROM yt_videos
-                                  WHERE cluster_id IN ({q}) AND disabled=0 ORDER BY comment_count DESC""", ids):
-            vids.setdefault(v["cluster_id"], []).append(
-                {"channel": v["channel"], "title": v["title"], "url": f"https://www.youtube.com/watch?v={v['video_id']}"})
+        for v in conn.execute(f"""SELECT cluster_id, video_id, channel, title, platform, url FROM yt_videos
+                                  WHERE cluster_id IN ({q}) AND disabled=0 AND comment_count > 0
+                                  ORDER BY comment_count DESC""", ids):
+            is_mnm = v["platform"] == "meneame"
+            vids.setdefault(v["cluster_id"], []).append({
+                "channel": v["channel"], "title": v["title"],
+                "platform": "Menéame" if is_mnm else "YouTube",
+                "url": v["url"] if is_mnm else f"https://www.youtube.com/watch?v={v['video_id']}"})
         for c in clusters:
             if c["readers_summary"]:
+                vs = vids.get(c["id"], [])
                 readers[c["id"]] = {"summary": c["readers_summary"], "count": c["readers_count"],
-                                    "at": c["readers_at"], "videos": vids.get(c["id"], [])[:2]}
+                                    "at": c["readers_at"], "videos": vs[:4],
+                                    "platforms": sorted({v["platform"] for v in vs}) or ["YouTube"]}
         for u in conn.execute(f"SELECT * FROM story_updates WHERE cluster_id IN ({q}) ORDER BY at", ids):
             updates.setdefault(u["cluster_id"], []).append(u)
         foreign_rows = conn.execute(

@@ -18,6 +18,7 @@ import db
 import export
 import feeds
 import intl
+import meneame
 import telegram
 import writer
 import youtube
@@ -268,6 +269,10 @@ def run_cycle(conn, fetcher=feeds.fetch_source, now=None, telegram_inline=True):
     except Exception:
         log.exception("YouTube falló")
         stats["youtube"] = {}
+    try:
+        stats["meneame"] = meneame.process(conn, now)
+    except Exception:
+        log.exception("Menéame falló")
     stats["ai_written"] = write_pending(conn, now)
     stats["readers"] = youtube.summarize_pending(conn, now)
     export.prune(conn, config.PRUNE_DAYS)

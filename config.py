@@ -56,13 +56,14 @@ YT_SEARCHES_PER_DAY = _env("YT_SEARCHES_PER_DAY", 90, int)  # la API permite 100
 YT_POLL_MIN = _env("YT_POLL_MIN", 30, int)                  # cada cuánto se miran los canales de los medios
 YT_MATCH_THRESHOLD = _env("YT_MATCH_THRESHOLD", 0.22, float)  # parecido mínimo vídeo-noticia
 YT_NEW_HOURS = _env("YT_NEW_HOURS", 24, int)                 # solo noticias nuevas (de menos de 24 h)
-YT_FIRST_READ_MIN = _env("YT_FIRST_READ_MIN", 60, int)        # primera lectura: vídeo con 1 h publicado
-YT_RECHECK_MIN = _env("YT_RECHECK_MIN", 180, int)             # después, releer cada 3 h…
+YT_FIRST_READ_MIN = _env("YT_FIRST_READ_MIN", 30, int)        # primera lectura: vídeo con 30 min publicado
+YT_RECHECK_MIN = _env("YT_RECHECK_MIN", 90, int)              # después, releer cada 90 min…
 YT_FOLLOW_HOURS = _env("YT_FOLLOW_HOURS", 24, int)            # …durante 24 h como máximo
-YT_MIN_COMMENTS = _env("YT_MIN_COMMENTS", 8, int)             # mínimo para resumir
+YT_MIN_COMMENTS = _env("YT_MIN_COMMENTS", 6, int)             # mínimo para resumir
 READERS_MAX_PER_CYCLE = _env("READERS_MAX_PER_CYCLE", 4, int)
-READERS_EVERY_MIN = _env("READERS_EVERY_MIN", 360, int)       # el resumen se rehace como mucho cada 6 h
-READERS_MIN_NEW = _env("READERS_MIN_NEW", 20, int)            # y solo si hay 20 comentarios nuevos o más
+READERS_EVERY_MIN = _env("READERS_EVERY_MIN", 120, int)       # el resumen se rehace como mucho cada 2 h
+READERS_MIN_NEW = _env("READERS_MIN_NEW", 10, int)            # y solo si hay 10 comentarios nuevos o más
+MENEAME_ENABLED = _env("MENEAME_ENABLED", 1, int)             # comentarios de Menéame (sin clave)
 
 # --- Canal de Telegram ---
 TELEGRAM_BOT_TOKEN = _env("TELEGRAM_BOT_TOKEN", "")

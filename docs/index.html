@@ -315,11 +315,14 @@ if (APP) { const l = document.getElementById("applink"); if (l) l.remove(); }
 function readersSection(s) {
   const r = s.readers;
   if (!r || !r.summary) return "";
-  const vids = (r.videos || []).map(v => `<a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer">vídeo de ${esc(v.channel)}</a>`).join(" y ");
+  const vids = (r.videos || []).map(v => v.platform === "Menéame"
+    ? `<a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer">Menéame</a>`
+    : `<a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer">vídeo de ${esc(v.channel)}</a>`).join(", ");
+  const where = (r.platforms || ["YouTube"]).join(" y ");
   return `<section class="readers">
     <h4>💬 Qué dicen los lectores</h4>
     <p>${esc(r.summary)}</p>
-    <div class="rm">Resumen automático (IA) de ${r.count} comentarios en YouTube${vids ? ` · ${vids}` : ""} · ${ago(r.at)}. No refleja la opinión de DobleCheck.</div>
+    <div class="rm">Resumen automático (IA) de ${r.count} comentarios en ${esc(where)}${vids ? ` · ${vids}` : ""} · ${ago(r.at)}. No refleja la opinión de DobleCheck.</div>
   </section>`;
 }
 

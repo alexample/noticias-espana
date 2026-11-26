@@ -160,7 +160,7 @@ READERS_SYSTEM = (
 
 READERS_PROMPT = """Noticia: {headline}
 
-Comentarios de lectores en vídeos de YouTube de {channels}. Van mezclados por turnos entre canales, los más valorados de cada uno primero; entre corchetes, el canal. Puede haber ruido:
+Comentarios de lectores en {channels} (vídeos de YouTube de esos medios y, si aparece, Menéame). Van mezclados por turnos entre canales, los más valorados de cada uno primero; entre corchetes, el canal. Puede haber ruido:
 {comments}
 
 Resume en 2-3 frases (máximo 70 palabras) qué opinan los lectores. Si las opiniones están muy divididas, dilo. Si los comentarios de un canal se inclinan claramente hacia una postura distinta de los de otro, tenlo en cuenta y no la presentes como la opinión general (puedes decir, por ejemplo, que en un canal predomina una postura y en otro la contraria). Devuelve SOLO un JSON: {{"resumen": "..."}}"""

@@ -117,6 +117,17 @@ CREATE TABLE IF NOT EXISTS yt_pool (
     seen_at      REAL NOT NULL,
     cluster_id   INTEGER          -- NULL = sin revisar, -1 = sin noticia
 );
+-- Envíos de Menéame (portada y pendientes) que enlazan a noticias
+CREATE TABLE IF NOT EXISTS mnm_links (
+    link_id      INTEGER PRIMARY KEY,
+    title        TEXT,
+    url          TEXT,          -- artículo original del medio
+    story_url    TEXT,          -- página del envío en Menéame
+    comments     INTEGER,
+    published_at REAL,
+    seen_at      REAL NOT NULL,
+    cluster_id   INTEGER        -- NULL = sin revisar, -1 = sin noticia
+);
 -- Contadores (cupo diario de búsquedas de YouTube)
 CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
 
@@ -151,6 +162,10 @@ def init(conn):
                        ("readers_count", "INTEGER"), ("readers_at", "REAL"), ("readers_videos", "INTEGER")):
         if name not in cols:
             conn.execute(f"ALTER TABLE clusters ADD COLUMN {name} {kind}")
+    vcols = {r[1] for r in conn.execute("PRAGMA table_info(yt_videos)")}
+    for name in ("platform", "url"):   # los «vídeos» pueden ser también envíos de Menéame
+        if name not in vcols:
+            conn.execute(f"ALTER TABLE yt_videos ADD COLUMN {name} TEXT")
     tcols = {r[1] for r in conn.execute("PRAGMA table_info(telegram_posts)")}
     if "posted_ai" not in tcols:  # 0 = publicada como última hora con el titular original, sin redactar
         conn.execute("ALTER TABLE telegram_posts ADD COLUMN posted_ai INTEGER NOT NULL DEFAULT 1")

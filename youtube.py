@@ -206,7 +206,8 @@ def match_videos(conn, now):
             continue
         if v["published_at"] < (eligible[cl.id] or 0) - 6 * 3600:
             continue  # vídeo anterior a la noticia
-        if conn.execute("SELECT COUNT(*) FROM yt_videos WHERE cluster_id=?", (cl.id,)).fetchone()[0] >= 3:
+        if conn.execute("SELECT COUNT(*) FROM yt_videos WHERE cluster_id=? AND COALESCE(platform, 'youtube')='youtube'",
+                        (cl.id,)).fetchone()[0] >= 3:
             continue
         conn.execute("UPDATE yt_pool SET cluster_id=? WHERE video_id=?", (cl.id, v["video_id"]))
         conn.execute(
@@ -262,6 +263,7 @@ def process(conn, now, get=api_get, countries=None):   # countries: ya no se usa
     vids = conn.execute(
         """SELECT v.video_id, v.cluster_id FROM yt_videos v JOIN clusters c ON c.id = v.cluster_id
            WHERE c.status='active' AND v.disabled=0 AND v.found_at >= ?
+             AND COALESCE(v.platform, 'youtube') = 'youtube'
              AND COALESCE(v.published_at, v.found_at) <= ?
              AND (v.checked_at IS NULL OR v.checked_at < ?)
            ORDER BY c.relevance DESC LIMIT 12""",

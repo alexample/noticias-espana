@@ -129,15 +129,18 @@ check ✓ "pendiente de confirmar" y el titular original citando al medio. Cuand
 medios la confirman, la IA la redacta (tiene prioridad) y en Telegram se responde al
 mensaje original con la versión confirmada ✓✓.
 
-### 9. «Qué dicen los lectores» (`youtube.py`)
-Se vigilan los canales de YouTube de ~26 medios españoles (RTVE, laSexta, Antena 3, El País…):
-cada 30 minutos se leen sus últimos vídeos y cada uno se asigna a su noticia con el mismo
-algoritmo que agrupa los artículos (sin IA); los vídeos sin noticia se reintentan durante 12 h.
-Solo noticias nuevas (menos de 24 h) de 2 medios o más, o de última hora. Los comentarios más valorados se leen cuando el vídeo lleva 1 h
-publicado y se releen cada 3 h durante 24 h (solo el texto, sin autores). Con al menos 8, la
-IA resume en 2-3 frases neutrales lo que opinan los lectores; el resumen se rehace como mucho
-cada 6 h y con 20 comentarios nuevos o más. Cabe holgadamente en el cupo gratuito de YouTube.
-Secreto: `YOUTUBE_API_KEY`.
+### 9. «Qué dicen los lectores» (`youtube.py`, `meneame.py`)
+Comentarios de dos fuentes, mezclados por turnos entre canales:
+- **YouTube:** se vigilan los canales de ~26 medios españoles; cada vídeo se asigna a su
+  noticia con el algoritmo de agrupación (sin IA). Requiere `YOUTUBE_API_KEY` (gratis).
+- **Menéame:** portada y pendientes; cada envío enlaza al artículo original, así que si es uno
+  de nuestros artículos la coincidencia es exacta (si no, se compara el título). Sin clave.
+
+Solo noticias nuevas (menos de 24 h) de 2 medios o más o de última hora. Los comentarios se
+leen a los 30 min y se releen cada 90 min durante 24 h (solo texto y votos, sin autores). Con
+al menos 6, la IA resume en 2-3 frases neutrales lo que opinan los lectores, distinguiendo si
+un canal se inclina hacia una postura; el resumen se rehace como mucho cada 2 h y con 10
+comentarios nuevos o más.
 
 ## Configuración (variables de entorno)
 
